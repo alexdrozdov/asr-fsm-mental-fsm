@@ -27,6 +27,8 @@ CNeuroState::CNeuroState(CNeuroTrigger *trigger, int nstate) {
 	string mypath = "/trigger/states/i" + stream.str();
 	cout << "\tCNeuroState::CNeuroState info - loading state from " << mypath << endl;
 
+	szCaption = xmlGetStringValue(xml, (mypath + "/caption").c_str());
+
 
 	//Идентификатор состояния. По идее, должен совпадать с nstate, но это уже на совести программиста ASR
 	id = xmlGetIntValue(xml,(mypath + "/id").c_str(),-1);
@@ -89,6 +91,8 @@ CNeuroState::CNeuroState(CNeuroTrigger *trigger, int nstate) {
 	net_inputs.resize(input_count);
 	net_outputs.resize(output_count);
 	next_states.resize(state_count);
+
+	fann_input = new float[input_count];
 
 	//Загружаем таблицу соединений входов триггера с входами нейронной сети
 	string input_common_path = mypath + "/input_links/i";
@@ -177,6 +181,15 @@ CNeuroState::CNeuroState(CNeuroTrigger *trigger, int nstate) {
 		}
 	}
 
+	//Загружаем информацию о кластере, в котроый входит это состояние
+	int nfriend_count = xmlGetIntValue(xml, (mypath + "/friends/count").c_str(),0);
+	if (nfriend_count > 0) {
+		unions.resize(nfriend_count);
+		string def_union_name = xmlGetStringValue(xml,(mypath + "/friends/caption").c_str());
+		unions[0] = trigger->get_union_by_name(def_union_name);
+		unions[0]->AddMemeber(id); //Добавляемся в этот кластер
+	}
+
 	//Загружаем таблицу кодирования следующих состояний триггера
 	string state_coding_path = mypath + "/state_coding/i";
 	for (int i=0;i<state_count;i++) {
@@ -221,7 +234,74 @@ CNeuroState::CNeuroState(CNeuroTrigger *trigger, int nstate) {
 	}
 }
 
+void CNeuroState::evalute_fann_output() {
+	//Заполняем массив для нейронной сети (переносим значения со входов триггера на входы ее массива)
+	for(int i=0;i<input_count;i++) {
+		//Получаем информацию о предшественнике, соспоставленном этому входу нейронной сети
+		trig_inout_spec *anch = trigger->anchs[net_inputs[i].from];
+
+		//На ее основании копируем одно из выходных значений предшественника
+		fann_input[net_inputs[i].to] = anch->trigger->values[anch->offs];
+	}
+
+	//Вычисляем результаты для этой сети
+	fann_output = fann->run(fann_input);
+}
+
+void CNeuroState::copy_outputs() {
+	for (int i=0;i<output_count;i++) {
+		double val = 0.0;
+		if (net_outputs[i].is_const) {
+			val = net_outputs[i].value;
+		} else {
+			val = fann_output[net_outputs[i].from];
+		}
+		trigger->values[net_outputs[i].to] = val;
+	}
+}
+
 void CNeuroState::ProcessInputs() {
+	evalute_fann_output();
+
+	//Определяем состояние, в который перешел триггер по мнению нейронной сети
+	double max_out_val = -1000000;
+	int next_state_id = id; //В случае чего, остаемся в этом состоянии
+	for (int i=0;i<state_count;i++) {
+		if (fann_output[i] > max_out_val) {
+			next_state_id = i;
+		}
+	}
+
+	//Копириуем оставшиеся результаты работы сети на выходы триггера
+	copy_outputs();
+
+	//Проверяем возможность такого перехода в кластере
+	if (unions.size()>0) {
+		next_state_id = unions[0]->TryState(next_state_id);
+	}
+
+	trigger->state = trigger->get_state_by_id(next_state_id);
+
+	if (id != next_state_id) {
+		//Вычисляем значения на выходе нейронной сети для этого нового состояния
+		trigger->state->evalute_fann_output();
+
+		//Переходим в это состояние
+		trigger->state->Enter();
+	}
+}
+
+
+void CNeuroState::Enter() {
+	copy_outputs();
+
+	//Проверяем, не было ли перехода между кластерами
+	if (unions.size() > 0 && unions[0] != trigger->neuro_union) {
+		trigger->neuro_union = unions[0];
+		trigger->neuro_union->Enter();
+	} else if (0 == unions.size()) {
+		trigger->neuro_union = NULL;
+	}
 }
 
 

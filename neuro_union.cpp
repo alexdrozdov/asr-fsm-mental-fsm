@@ -28,6 +28,9 @@ CNeuroUnion::CNeuroUnion(CNeuroTrigger *trigger, int nunion) {
 
 	//Идентификатор объединения. По идее, должен совпадать с nstate, но это уже на совести программиста ASR
 	id = xmlGetIntValue(xml,(mypath + "/id").c_str(),-1);
+	if (id != nunion) {
+		cout << "\tCNeuroUnion::CNeuroUnion error - id value differs from element number" << endl;
+	}
 
 	szCaption = xmlGetStringValue(xml,(mypath + "/caption").c_str());
 
@@ -39,14 +42,40 @@ CNeuroUnion::CNeuroUnion(CNeuroTrigger *trigger, int nunion) {
 	time_ovf_ns = xmlGetIntValue(xml, (mypath + "/maxtime/next_state").c_str(), 0);
 	max_time_en = xmlGetBooleanValue(xml, (mypath + "/maxtime/enabled").c_str(), 0);
 
+	int nmembers = xmlGetIntValue(xml, "/trigger/states/count", -1);
+	members.resize(nmembers,false);
 	time_enter = 0;
 }
 
 
 bool CNeuroUnion::IsMember(int nstate) {
-	return false;
+	//FIXME Добавить проверку номера состояния, в которое выполняется переход. Проверка должна выполняться только при включении специального режима
+	return members[nstate];
+}
+
+void CNeuroUnion::AddMemeber(int nstate) {
+
 }
 
 int CNeuroUnion::TryState(int nstate) {
-	return 0;
+	long long union_time = fsm->GetCurrentTime() - time_enter; //Время, в течение которого триггер находился в этом кластере
+	bool stay_in_union = members[nstate]; //Совершается попытка перехода в сотсоняние, которое выведет триггер из кластера
+
+	bool time_underflow = !stay_in_union && min_time_en && (union_time < min_time); //Триггер пытается покинуть состояние до истечения мимнимального времени
+	bool time_overflow = stay_in_union && max_time_en && (union_time > max_time); //Триггер пытается остаться в состоянии по истечении максимального времени
+
+	if (time_underflow) {
+		//Предлагаем переход в альтернативное состояние из-за невыполнения требований по минимальной длительности
+		return time_udf_ns;
+	}
+	if (time_overflow) {
+		//Предлагаем переход в альтернативное состояние из-за превышения времни находждения в кластере
+		return time_ovf_ns;
+	}
+
+	return nstate;
+}
+
+void CNeuroUnion::Enter() {
+	time_enter = fsm->GetCurrentTime();
 }

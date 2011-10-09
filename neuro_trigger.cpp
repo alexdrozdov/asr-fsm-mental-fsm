@@ -77,6 +77,11 @@ CNeuroTrigger::CNeuroTrigger(string file_name) {
 		states[i] = new CNeuroState(this,i);
 	}
 
+	//Переводим триггер в его начальное состояние
+	state = NULL;
+	int def_state = xmlGetIntValue(xml,"/trigger/states/default",0);
+	SetState(def_state);
+
 	//Инициализируем запись об этом триггере для дерева триггеров
 	tree_leaf = new trigger_tree_leaf;
 	tree_leaf->distance = 0;
@@ -204,10 +209,26 @@ int CNeuroTrigger::BindFrom(trig_inout_spec* self, trig_inout_spec* other) {
 }
 
 void CNeuroTrigger::ProcessAnchestors() {
+	state->ProcessInputs();
 	handle_values_differences();
 }
 
 void CNeuroTrigger::handle_values_differences() {
+	if (dump_enabled && dump_to_file) {
+		dump_stream << " OUTS ";
+		for (int i=0;i<out_values_count;i++) {
+			dump_stream << values[i] << " ";
+		}
+		dump_stream << "STATE " << state->szCaption;
+		dump_stream << endl;
+	} else if (dump_enabled) {
+		cout << " OUTS ";
+		for (int i=0;i<out_values_count;i++) {
+			cout << values[i] << " ";
+		}
+		cout << "STATE " << state->szCaption;
+		cout << endl;
+	}
 	for (int i=0;i<5;i++) {
 		if (values[i] != prev_values[i]) {
 			prev_values[i] = values[i];
@@ -229,5 +250,53 @@ CNeuroTrigger* load_neuro_trigger(std::string filename) {
 	return new CNeuroTrigger(filename);
 }
 
+int CNeuroTrigger::SetState(int state_num) {
+	CNeuroState* next_state = states[state_num];
+
+	if (state != next_state) {
+		// Состояние меняется. Проверяем изменение кластера сотсояний
+		if (next_state->unions.size() > 0) {
+			neuro_union = next_state->unions[0];
+		} else {
+			neuro_union = NULL;
+		}
+	}
+
+	state = next_state;
+	return state_num;
+}
+
+
+CNeuroUnion* CNeuroTrigger::get_union_by_name(std::string union_name) {
+	std::vector<CNeuroUnion*>::iterator it;
+	for (it=unions.begin();it!=unions.end();it++) {
+		CNeuroUnion* cur = *it;
+		if (union_name == cur->szCaption) {
+			return cur;
+		}
+	}
+
+	return NULL;
+}
+
+CNeuroUnion* CNeuroTrigger::get_union_by_id(int nunion) {
+	return unions[nunion];
+}
+
+CNeuroState* CNeuroTrigger::get_state_by_name(std::string state_name) {
+	std::vector<CNeuroState*>::iterator it;
+	for (it=states.begin();it!=states.end();it++) {
+		CNeuroState* cur = *it;
+		if (state_name == cur->szCaption) {
+			return cur;
+		}
+	}
+
+	return NULL;
+}
+
+CNeuroState* CNeuroTrigger::get_state_by_id(int nstate) {
+	return states[nstate];
+}
 
 

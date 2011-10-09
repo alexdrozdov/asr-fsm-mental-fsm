@@ -30,6 +30,8 @@ public:
 	bool IsMember(int nstate); //Проверяет принадлежность состояния к этому объединению
 	void AddMemeber(int nstate); //Добавить состояние в эту группу
 
+	void Enter();
+
 	int TryState(int nstate);  //Выполняет попытку перейти в указанное состояние. Возвращает новое состояние.
 	//Объединение может разрещить переход или отправить автомат в другое состояние в связи с невыполнением условия
 
@@ -58,8 +60,14 @@ public:
 	CNeuroState(CNeuroTrigger *trigger, int nstate);
 	void ProcessInputs();
 
+	void Enter();
+
 	friend class CNeuroTrigger;
 private:
+
+	void evalute_fann_output();
+	void copy_outputs();
+
 	FANN::neural_net *fann;
 	std::vector<from_to_links> net_inputs;
 	std::vector<from_to_links> net_outputs;
@@ -67,6 +75,9 @@ private:
 	std::string fann_file_name;
 	std::string tcl_file_name;
 	int id;
+
+	float *fann_input;
+	float *fann_output;
 
 	bool stable;
 
@@ -84,6 +95,10 @@ private:
 
 	long long time_enter; //Время, когда триггер попал в это состояние
 	CNeuroTrigger* trigger;
+
+	std::vector<CNeuroUnion*> unions;
+
+	std::string szCaption;
 };
 
 
@@ -114,6 +129,12 @@ public:
 private:
 
 	void handle_values_differences();
+
+	CNeuroUnion* get_union_by_name(std::string union_name);
+	CNeuroUnion* get_union_by_id(int nunion);
+
+	CNeuroState* get_state_by_name(std::string state_name);
+	CNeuroState* get_state_by_id(int nstate);
 
 
 	std::vector<double> prev_values;
