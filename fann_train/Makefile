@@ -5,11 +5,13 @@ CFLAGS_AUXLIB=-I ../../tcl8.5.9/generic/ \
               -I ../../fann-2.1.0/src/include
 
 LDFLAGS_AUXLIBS=-L ../../fann-2.1.0/src/.libs  -lfann \
-        -L ../../tcl8.5.9/unix/ -ltcl8.5
+        -L ../../tcl8.5.9/unix/ -ltcl8.5 -ltclreadline
 
 SRCS=   main.cpp \
         common.cpp \
-        opt_handlers.cpp
+        opt_handlers.cpp \
+        packet_funcs.cpp \
+        interactive.cpp
 
 OBJS:=$(SRCS:%.cpp=./obj/%.o)
 

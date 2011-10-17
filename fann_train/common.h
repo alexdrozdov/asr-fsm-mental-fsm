@@ -23,24 +23,28 @@ typedef struct _md5_checksum {
 
 // Структура, содержащая параметры запуска, переданные пользователем программе
 typedef struct _cmd_options {
-	bool show_version;
-	bool force_reserved;
-	bool force_operate;
+	unsigned int num_input;
+	unsigned int num_output;
+	unsigned int num_layers;
+	unsigned int num_neurons_hidden;
+	double desired_error;
+	unsigned int max_epochs;
+	unsigned int epochs_between_reports;
 
-	bool disable_net;
+	std::string train_file_name;
+	std::string net_file_name;
+	std::string script_file_name;
 
-	std::vector<std::string> disabled_libraries;
-	std::vector<std::string> disabled_xml;
+	bool b_i;
+	bool b_o;
+	bool b_h;
+	bool b_l;
+	bool b_t;
+	bool b_n;
 
-	unsigned int rek_number;
-
-	bool web_service;
-	bool udp_service;
-	bool pthet_service;
-
-	bool dump_trpr;
-	bool dump_trizl;
-	bool dump_mil;
+	bool mode_interactive; //Интерактивный режим работы
+	bool mode_script;      //Отработка скрипта
+	bool mode_packet;      //Пакетный режим
 } cmd_options;
 
 extern cmd_options run_options;
@@ -55,7 +59,7 @@ typedef struct _long_opt {
 //Прототип функции-обработчика опции командной строки.
 //Вызывается при обнаружении соответсвующей опции
 typedef int (*option_handler_fcn)(char opt_name, char* popt_val);
-#define OHRC_CONINUE 0 //Параметр обработан правильно. Продолжить работу
+#define OHRC_CONTINUE 0 //Параметр обработан правильно. Продолжить работу
 #define OHRC_EXIT    1 //Параметр обработан правильно. Завершить работу
 #define OHRC_ERROR   2 //Неправильный параметр. Завершить работу
 
