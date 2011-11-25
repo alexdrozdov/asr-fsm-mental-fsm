@@ -54,12 +54,21 @@ bool CNeuroUnion::IsMember(int nstate) {
 }
 
 void CNeuroUnion::AddMemeber(int nstate) {
+	if (nstate >= (int)members.size()) {
+		cout << "CNeuroUnion::AddMemeber error - попытка добавить член объединения с номером " << nstate << ", превышающим количество членов" << endl;
+		return;
+	}
+	members[nstate] = true;
 
 }
 
 int CNeuroUnion::TryState(int nstate) {
 	long long union_time = fsm->GetCurrentTime() - time_enter; //Время, в течение которого триггер находился в этом кластере
-	bool stay_in_union = members[nstate]; //Совершается попытка перехода в сотсоняние, которое выведет триггер из кластера
+	cout << "Current time " << fsm->GetCurrentTime() << endl;
+	cout << "Union time " << fsm->GetCurrentTime() - time_enter << endl;
+	cout << "Max time " << max_time << endl;
+	bool stay_in_union = members[nstate]; //Совершается попытка перехода в состояние, которое выведет триггер из кластера
+	cout << "Stay in union " << stay_in_union << endl;
 
 	bool time_underflow = !stay_in_union && min_time_en && (union_time < min_time); //Триггер пытается покинуть состояние до истечения мимнимального времени
 	bool time_overflow = stay_in_union && max_time_en && (union_time > max_time); //Триггер пытается остаться в состоянии по истечении максимального времени
