@@ -267,10 +267,13 @@ void CNeuroState::ProcessInputs() {
 	double max_out_val = -1000000;
 	int next_state_id = id; //В случае чего, остаемся в этом состоянии
 	for (int i=0;i<state_count;i++) {
+		cout << " " <<  fann_output[i];
 		if (fann_output[i] > max_out_val) {
+			max_out_val = fann_output[i];
 			next_state_id = i;
 		}
 	}
+	cout << endl;
 
 	//Копириуем оставшиеся результаты работы сети на выходы триггера
 	copy_outputs();

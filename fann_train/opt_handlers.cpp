@@ -55,6 +55,10 @@ void fill_option_handlers() {
 	ohd.option = 'm'; ohd.long_option = "max-epochs";
 	ohd.has_arg = true; ohd.arg_strict = true; ohd.hdlr = opt_max_epochs_handler;
 	add_option_handler(ohd);
+
+	ohd.option = 'p'; ohd.long_option = "project";
+	ohd.has_arg = true; ohd.arg_strict = true; ohd.hdlr = opt_project_handler;
+	add_option_handler(ohd);
 }
 
 
@@ -144,6 +148,17 @@ int opt_desired_error_handler(char opt_name, char* popt_val) {
 int opt_max_epochs_handler(char opt_name, char* popt_val) {
 	run_options.max_epochs = strtol(popt_val,NULL,0);
 	run_options.mode_packet = true;
+	return OHRC_CONTINUE;
+}
+
+int opt_project_handler(char opt_name, char* popt_val) {
+	if (NULL == popt_val) {
+		cout << "opt_project_handler error - не задан файл проекта" << endl;
+		return OHRC_EXIT;
+	}
+	run_options.project_file = (string)popt_val;
+	run_options.mode_interactive = true;
+	run_options.load_project = true;
 	return OHRC_CONTINUE;
 }
 

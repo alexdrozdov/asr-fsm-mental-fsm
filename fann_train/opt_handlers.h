@@ -25,6 +25,7 @@ extern int opt_train_file_handler(char opt_name, char* popt_val);
 extern int opt_net_file_handler(char opt_name, char* popt_val);
 extern int opt_desired_error_handler(char opt_name, char* popt_val);
 extern int opt_max_epochs_handler(char opt_name, char* popt_val);
+extern int opt_project_handler(char opt_name, char* popt_val);
 
 
 

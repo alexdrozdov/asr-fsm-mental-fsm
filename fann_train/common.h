@@ -34,6 +34,7 @@ typedef struct _cmd_options {
 	std::string train_file_name;
 	std::string net_file_name;
 	std::string script_file_name;
+	std::string project_file;
 
 	bool b_i;
 	bool b_o;
@@ -42,6 +43,7 @@ typedef struct _cmd_options {
 	bool b_t;
 	bool b_n;
 
+	bool load_project;     //Загрузить указанный проект
 	bool mode_interactive; //Интерактивный режим работы
 	bool mode_script;      //Отработка скрипта
 	bool mode_packet;      //Пакетный режим
