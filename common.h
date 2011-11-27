@@ -21,35 +21,6 @@ typedef struct _md5_checksum {
 	bool ok;
 } md5_checksum;
 
-// Структура, содержащая параметры запуска, переданные пользователем программе
-typedef struct _cmd_options {
-	unsigned int num_input;
-	unsigned int num_output;
-	unsigned int num_layers;
-	unsigned int num_neurons_hidden;
-	double desired_error;
-	unsigned int max_epochs;
-	unsigned int epochs_between_reports;
-
-	std::string train_file_name;
-	std::string net_file_name;
-	std::string script_file_name;
-	std::string project_file;
-
-	bool b_i;
-	bool b_o;
-	bool b_h;
-	bool b_l;
-	bool b_t;
-	bool b_n;
-
-	bool load_project;     //Загрузить указанный проект
-	bool mode_interactive; //Интерактивный режим работы
-	bool mode_script;      //Отработка скрипта
-	bool mode_packet;      //Пакетный режим
-} cmd_options;
-
-extern cmd_options run_options;
 
 typedef struct _long_opt {
 	const char *name;
@@ -75,7 +46,7 @@ typedef struct _option_handler_desc {
 
 extern std::string get_executable_path(char* argv0);
 extern std::string build_file_path(std::string fpath);
-extern std::string build_project_path(string fpath);
+extern std::string build_project_path(std::string fpath);
 
 extern int parse_options(int argc, char *argv[]);
 extern void add_option_handler(option_handler_desc ohd);
@@ -84,5 +55,6 @@ extern std::string build_version_date(unsigned int d, bool str, bool hex);
 extern std::string build_device_type(unsigned int t, bool str, bool hex);
 
 extern std::string executable_path;
+extern std::string project_path;
 
 #endif /* COMMON_H_ */

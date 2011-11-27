@@ -235,6 +235,28 @@ int xmlGetBooleanValue(xmlConfigPtr xml, const char* path, int def) {
 	return atoi(szVal);
 }
 
+int xmlGetDelayUsValue(xmlConfigPtr xml, const char* path, int def) {
+	char* szVal = xmlGetStringValue(xml,path);
+	if (NULL == szVal) {
+		return def;
+	}
+	int orig_val = atoi(szVal);
+
+	if (NULL != strstr(szVal,"ms"))
+		return orig_val * 1000;
+	if (NULL != strstr(szVal,"us"))
+		return orig_val;
+	if (NULL != strstr(szVal,"ns"))
+		return orig_val / 1000;
+	if (NULL != strstr(szVal,"s"))
+		return orig_val * 1000000;
+	if (0 == orig_val)
+		return 0;
+
+	fprintf(stderr,"xmlGetDelayUsValue warning - не указана размерность времени для %s\n", path);
+	return orig_val;
+}
+
 int xmlValidatePath(xmlConfigPtr xml, const char* path) {
 	char *szVal = xmlGetStringValue(xml, path);
 	if (NULL == szVal) {

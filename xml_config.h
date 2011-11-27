@@ -18,6 +18,7 @@ int xmlGetIntValue(xmlConfigPtr xml, const char* path, int def);
 double xmlGetDoubleValue(xmlConfigPtr xml, const char* path, double def);
 char* xmlGetStringValue(xmlConfigPtr xml, const char* path);
 int xmlGetBooleanValue(xmlConfigPtr xml, const char* path, int def);
+int xmlGetDelayUsValue(xmlConfigPtr xml, const char* path, int def);
 int xmlValidatePath(xmlConfigPtr xml, const char* path);
 
 

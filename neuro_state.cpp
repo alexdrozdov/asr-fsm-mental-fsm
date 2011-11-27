@@ -11,6 +11,7 @@
 #include "neuro_trigger.h"
 #include "mental_fsm.h"
 #include "xml_config.h"
+#include "common.h"
 
 #include "trigger_tree.h"
 
@@ -39,7 +40,7 @@ CNeuroState::CNeuroState(CNeuroTrigger *trigger, int nstate) {
 		cout << "CNeuroState::CNeuroState error - couldn`t extract fann file name" << endl;
 		return;
 	}
-	fann_file_name = tmp_str;
+	fann_file_name = build_project_path(tmp_str); //FIXME Заменить на путь в папке проекта
 
 	//Путь к файлу, обеспечивающему четкую логику кластера в этом состоянии
 	tmp_str = xmlGetStringValue(xml,(mypath + "/logic").c_str());

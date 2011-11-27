@@ -7,6 +7,7 @@
 //============================================================================
 
 #include <iostream>
+#include <sstream>
 #include <map>
 
 #include <sys/types.h>
@@ -35,6 +36,8 @@ int bindtrigger_handler(ClientData clientData, Tcl_Interp* interp, int argc, CON
 int netlink_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int tree_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int mkdump_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
+int fsm_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
+int triggers_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 
 typedef CBaseTrigger* (*trigger_init_ptr)(std::string);
 
@@ -179,21 +182,6 @@ int init_mentalstate_structs(Tcl_Interp *interp) {
 			(Tcl_CmdDeleteProc*) NULL
 	);
 
-
-	fsm = new MentalFsm();
-	init_trigger_handles();
-	create_trigger_tree();
-	create_net_link(project_path + "netlink.xml");
-	if (0 != load_triggers(interp,project_path + "triggers/")) {
-		return TCL_ERROR;
-	}
-
-	if (0 != bind_triggers(interp,project_path + "links/") ) {
-		return TCL_ERROR;
-	}
-
-	build_trigger_tree();
-
 	Tcl_CreateCommand(interp,
 			"netlink",
 			netlink_handler,
@@ -207,6 +195,26 @@ int init_mentalstate_structs(Tcl_Interp *interp) {
 			(ClientData) NULL,
 			(Tcl_CmdDeleteProc*) NULL
 	);
+
+	Tcl_CreateCommand(interp,
+			"fsm",
+			fsm_handler,
+			(ClientData) NULL,
+			(Tcl_CmdDeleteProc*) NULL
+	);
+
+	Tcl_CreateCommand(interp,
+			"triggers",
+			triggers_handler,
+			(ClientData) NULL,
+			(Tcl_CmdDeleteProc*) NULL
+	);
+
+
+	fsm = new MentalFsm();
+	init_trigger_handles();
+	create_trigger_tree();
+	create_net_link(project_path + "netlink.xml");
 
 	Tcl_SetVar(interp, "mental_fsm(loaded)", "1",TCL_GLOBAL_ONLY);
 	return 0;
@@ -333,6 +341,83 @@ int bindtrigger_handler(ClientData clientData, Tcl_Interp* interp, int argc, CON
 
 int netlink_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
 	return net_link->TclHandler(interp,argc,argv);
+}
+
+int triggers_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
+	if (2 == argc) {
+		string cmd = argv[1];
+		if ("build_tree" == cmd) {
+			build_trigger_tree();
+			return TCL_OK;
+		}
+	}
+	if (3 == argc) {
+		string cmd = argv[1];
+		string path = argv[2];
+		if ("load" == cmd) {
+			if (0 != load_triggers(interp,project_path + path)) {
+				string errinfo = (string)"Сбой при загрузке триггеров из папки " + path;
+				Tcl_SetResult(interp, (char*)errinfo.c_str(), TCL_VOLATILE);
+				return TCL_ERROR;
+			}
+			Tcl_SetResult(interp, (char*)"", TCL_STATIC);
+			return TCL_OK;
+		}
+		if ("bind" == cmd) {
+			if (0 != bind_triggers(interp,project_path + path) ) {
+				string errinfo = (string)"Сбой при загрузке связей из папки " + path;
+				Tcl_SetResult(interp, (char*)errinfo.c_str(), TCL_VOLATILE);
+				return TCL_ERROR;
+			}
+			Tcl_SetResult(interp, (char*)"", TCL_STATIC);
+			return TCL_OK;
+		}
+	}
+
+	Tcl_SetResult(interp, (char*)"fsm - wrong params. Must be ?load folder?, ?bind folder?, build_tree", TCL_STATIC);
+	return TCL_ERROR;
+}
+
+
+int fsm_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
+	if (2 == argc) {
+		string cmd = argv[1];
+		if ("samplerate(local)" == cmd) {
+			ostringstream ostr;
+			ostr << fsm->GetLocalSamplerate();
+			Tcl_SetResult(interp, (char*)ostr.str().c_str(), TCL_VOLATILE);
+			return TCL_OK;
+		}
+		if ("samplerate(remote)" == cmd) {
+			ostringstream ostr;
+			ostr << fsm->GetRemoteSamplerate();
+			Tcl_SetResult(interp, (char*)ostr.str().c_str(), TCL_VOLATILE);
+			return TCL_OK;
+		}
+	}
+
+	if (3 == argc) {
+		string cmd = argv[1];
+		std::basic_stringstream<char> aux_param;
+		aux_param << argv[2];
+		if ("samplerate(local)" == cmd) {
+			unsigned int samplerate = 0;
+			aux_param >> samplerate;
+			fsm->SetLocalSamplerate(samplerate);
+			Tcl_SetResult(interp, (char*)"", TCL_STATIC);
+			return TCL_OK;
+		}
+		if ("samplerate(remote)" == cmd) {
+			unsigned int samplerate = 0;
+			aux_param >> samplerate;
+			fsm->SetRemoteSamplerate(samplerate);
+			Tcl_SetResult(interp, (char*)"", TCL_STATIC);
+			return TCL_OK;
+		}
+	}
+
+	Tcl_SetResult(interp, (char*)"fsm - wrong params. Must be samplerate(local), samplerate(remote)", TCL_STATIC);
+	return TCL_ERROR;
 }
 
 int tree_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {

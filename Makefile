@@ -16,7 +16,8 @@ SRCS=   main.cpp \
 		base_trigger.cpp \
 		neuro_trigger.cpp \
 		neuro_state.cpp \
-		neuro_union.cpp
+		neuro_union.cpp \
+		common.cpp
 
 OBJS:=$(SRCS:%.cpp=./obj/%.o)
 

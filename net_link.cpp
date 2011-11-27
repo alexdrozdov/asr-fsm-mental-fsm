@@ -380,7 +380,7 @@ int CNetLink::process_time_msg(unsigned char* buf, int len) {
 		exit(4);
 	}
 
-	fsm->RunToTime(new_time);
+	fsm->RunToTime(fsm->ScaleRemoteTime(new_time));
 	//cout << "time is" << new_time << endl;
 	return 0;
 }
@@ -390,6 +390,28 @@ int CNetLink::process_sec_msg(unsigned char* buf, int len) {
 }
 
 int CNetLink::process_link_msg(unsigned char* buf, int len) {
+	int req_size = 4+4+sizeof(unsigned int)*2;
+	if (len < req_size) {
+		cout << "CNetLink::process_link_msg atacked - frame is too short to be valid" << endl;
+		exit(4);
+	}
+	unsigned int *pcmd = (unsigned int*)(buf + 8);
+	switch (*pcmd) {
+		case nllt_version:
+			//FIXME Реализовать
+		case nllt_reset_buffers:
+		case nllt_close_connection:
+		case nllt_sleep:
+			cout << "CNetLink::process_link_msg warning - запрос на нереализованную команду управления соединением - " << *pcmd << endl;
+			break;
+		case nllt_samplerate:
+			{unsigned int *psamplerate = (unsigned int*)(buf + 12);
+			fsm->SetRemoteSamplerate(*psamplerate);
+			}
+			break;
+		default:
+			cout << "CNetLink::process_link_msg warning - запрос на неизвестную команду управления соединением - " << *pcmd << endl;
+	}
 	return 0;
 }
 

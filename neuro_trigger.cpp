@@ -63,7 +63,6 @@ CNeuroTrigger::CNeuroTrigger(string file_name) {
 		}
 	}
 
-
 	//Инициализируем внутренние состояния этого триггера
 	states_count= xmlGetIntValue(xml,"/trigger/states/count",-1);
 	if (in_values_count < 1) {
@@ -229,7 +228,7 @@ void CNeuroTrigger::handle_values_differences() {
 		cout << "STATE " << state->szCaption;
 		cout << endl;
 	}
-	for (int i=0;i<5;i++) {
+	for (int i=0;i<out_values_count;i++) {
 		if (values[i] != prev_values[i]) {
 			prev_values[i] = values[i];
 			vector<trig_inout_spec*>::iterator it;

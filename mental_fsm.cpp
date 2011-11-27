@@ -13,6 +13,9 @@ using namespace std;
 
 MentalFsm::MentalFsm() {
 	current_time = 0;
+
+	local_samplerate = 1;
+	remote_samplerate = 1;
 }
 
 int MentalFsm::RegisterTimeTrigger(CBaseTrigger* trigger) {
@@ -69,9 +72,9 @@ int MentalFsm::RegisterTrigger(CBaseTrigger* trigger) {
 
 CBaseTrigger* MentalFsm::FindTrigger(std::string name) {
 	map<string,CBaseTrigger*>::iterator mit = trig_dict.find(name);
-	if (mit != trig_dict.end()) {
+	if (mit != trig_dict.end())
 		return mit->second;
-	}
+
 	return NULL;
 }
 
@@ -82,26 +85,39 @@ long long MentalFsm::GetCurrentTime() {
 int MentalFsm::RunToTime(long long new_time) {
 	//Сначала обрабатываем все изменения, которые не связаны с временем:
 	//обрабатывем цепочку триггеров, измененную сообщениями от клиента
-	//
-
-	//cout << "new time " << new_time << endl;
-
 	trigger_tree_leaf* ttl = NULL;
 	//Обрабатываем триггеры с точки зрения функциональной работы
-	while (NULL != (ttl = trigger_tree->ExtractCandidate())) {
-		//cout << "MentalFsm::RunToTime info processing " << ttl->trigger->szTriggerName << endl;
+	while (NULL != (ttl = trigger_tree->ExtractCandidate()))
 		ttl->trigger->ProcessAnchestors();
-	}
 
 	//Пост процессинг (например, для вывода дампов)
-	while (NULL != (ttl = trigger_tree->ExtractPostprocess())) {
+	while (NULL != (ttl = trigger_tree->ExtractPostprocess()))
 			ttl->trigger->PostprocessTasks();
-		}
-	current_time = new_time;
 
-	//cout << "MentalFsm::RunToTime info - complete" << endl;
+	current_time = new_time;
 	return 0;
 }
+
+void MentalFsm::SetLocalSamplerate(unsigned int samplerate) {
+	local_samplerate = samplerate;
+}
+
+void MentalFsm::SetRemoteSamplerate(unsigned int samplerate) {
+	remote_samplerate = samplerate;
+}
+
+unsigned int MentalFsm::GetLocalSamplerate() {
+	return local_samplerate;
+}
+
+unsigned int MentalFsm::GetRemoteSamplerate() {
+	return remote_samplerate;
+}
+
+long long MentalFsm::ScaleRemoteTime(long long remote_time) {
+	return remote_time * local_samplerate / remote_samplerate;
+}
+
 
 MentalFsm* fsm = NULL;
 

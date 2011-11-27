@@ -23,7 +23,6 @@ string executable_path;
 string project_path;
 
 map<char,option_handler_desc> option_handlers;
-cmd_options run_options;
 
 std::string get_executable_path(char* argv0) {
 	string cwd = getcwd(NULL,0);

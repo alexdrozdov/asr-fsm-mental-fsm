@@ -34,11 +34,11 @@ CNeuroUnion::CNeuroUnion(CNeuroTrigger *trigger, int nunion) {
 
 	szCaption = xmlGetStringValue(xml,(mypath + "/caption").c_str());
 
-	min_time    = xmlGetIntValue(xml, (mypath + "/mintime/value").c_str(), -1);
+	min_time    = (int)((long long)xmlGetDelayUsValue(xml, (mypath + "/mintime/value").c_str(), -1) * (long long)fsm->GetLocalSamplerate() / 1000000LL);
 	time_udf_ns = xmlGetIntValue(xml, (mypath + "/mintime/next_state").c_str(), 0);
 	min_time_en = xmlGetBooleanValue(xml, (mypath + "/mintime/enabled").c_str(), 0);
 
-	max_time    = xmlGetIntValue(xml, (mypath + "/maxtime/value").c_str(), -1);
+	max_time    = (int)((long long)xmlGetDelayUsValue(xml, (mypath + "/maxtime/value").c_str(), -1) * (long long)fsm->GetLocalSamplerate() / 1000000LL);
 	time_ovf_ns = xmlGetIntValue(xml, (mypath + "/maxtime/next_state").c_str(), 0);
 	max_time_en = xmlGetBooleanValue(xml, (mypath + "/maxtime/enabled").c_str(), 0);
 
@@ -47,6 +47,11 @@ CNeuroUnion::CNeuroUnion(CNeuroTrigger *trigger, int nunion) {
 	time_enter = 0;
 }
 
+void CNeuroUnion::Print() {
+	cout << "LocalSampleRate " << fsm->GetLocalSamplerate() << endl;
+	cout << "Max union time " << max_time << endl;
+	cout << "Min union time " << min_time << endl;
+}
 
 bool CNeuroUnion::IsMember(int nstate) {
 	//FIXME Добавить проверку номера состояния, в которое выполняется переход. Проверка должна выполняться только при включении специального режима
@@ -64,11 +69,7 @@ void CNeuroUnion::AddMemeber(int nstate) {
 
 int CNeuroUnion::TryState(int nstate) {
 	long long union_time = fsm->GetCurrentTime() - time_enter; //Время, в течение которого триггер находился в этом кластере
-	cout << "Current time " << fsm->GetCurrentTime() << endl;
-	cout << "Union time " << fsm->GetCurrentTime() - time_enter << endl;
-	cout << "Max time " << max_time << endl;
 	bool stay_in_union = members[nstate]; //Совершается попытка перехода в состояние, которое выведет триггер из кластера
-	cout << "Stay in union " << stay_in_union << endl;
 
 	bool time_underflow = !stay_in_union && min_time_en && (union_time < min_time); //Триггер пытается покинуть состояние до истечения мимнимального времени
 	bool time_overflow = stay_in_union && max_time_en && (union_time > max_time); //Триггер пытается остаться в состоянии по истечении максимального времени

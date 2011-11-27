@@ -14,14 +14,12 @@
 #include "tcl.h"
 #include "mentalstate.h"
 
+#include "common.h"
+
 using namespace std;
 
-string get_executable_path(char* argv0);
 string get_project_path(char* argv0);
 bool check_project_path ();
-
-string executable_path;
-string project_path;
 
 int Tcl_AppInit(Tcl_Interp *interp);
 
@@ -38,9 +36,9 @@ main(
 	}
 
 	executable_path = get_executable_path(argv[0]);
-	cout << "Running from " << executable_path << endl;
-
 	project_path = get_project_path(argv[1]);
+
+	cout << "Running from " << executable_path << endl;
 	cout << "Project is " << project_path << endl;
 
 	if (!check_project_path()) {
@@ -51,15 +49,6 @@ main(
 	Tcl_Main(1, argv, Tcl_AppInit);
 
     return 0;
-}
-
-string get_executable_path(char* argv0) {
-	string cwd = getcwd(NULL,0);
-	string argv_p = argv0 + 1;
-	string full_exe_path = cwd + argv_p;
-	size_t last_slash = full_exe_path.rfind('/');
-
-	return full_exe_path.substr(0,last_slash+1);
 }
 
 string get_project_path (char* argv1) {

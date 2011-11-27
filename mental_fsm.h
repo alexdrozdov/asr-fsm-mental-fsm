@@ -23,9 +23,19 @@ public:
 
 	long long GetCurrentTime();
 	int RunToTime(long long new_time);
+
+	void SetLocalSamplerate(unsigned int samplerate);
+	void SetRemoteSamplerate(unsigned int samplerate);
+
+	unsigned int GetLocalSamplerate();
+	unsigned int GetRemoteSamplerate();
+
+	long long ScaleRemoteTime(long long remote_time);
 private:
 
 	long long current_time;
+	unsigned int local_samplerate;
+	unsigned int remote_samplerate;
 
 	std::vector<CBaseTrigger*> triggers;    //Все триггеры, зарегистрированые в этом обработчике
 	std::vector<CBaseTrigger*> unprocessed; //Триггеры, которые требуется обработать
