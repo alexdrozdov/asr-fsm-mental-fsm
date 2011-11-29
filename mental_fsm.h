@@ -26,16 +26,23 @@ public:
 
 	void SetLocalSamplerate(unsigned int samplerate);
 	void SetRemoteSamplerate(unsigned int samplerate);
+	void SetMinSamplerate(unsigned int samplerate);
 
 	unsigned int GetLocalSamplerate();
 	unsigned int GetRemoteSamplerate();
+	unsigned int GetMinSamplerate();
 
 	long long ScaleRemoteTime(long long remote_time);
 private:
 
+	int StepToTime(long long new_time);
+	void TouchTimeTriggers();
+
 	long long current_time;
 	unsigned int local_samplerate;
 	unsigned int remote_samplerate;
+	unsigned int min_samplerate;
+	long long max_time_step;
 
 	std::vector<CBaseTrigger*> triggers;    //Все триггеры, зарегистрированые в этом обработчике
 	std::vector<CBaseTrigger*> unprocessed; //Триггеры, которые требуется обработать

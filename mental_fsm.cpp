@@ -16,6 +16,8 @@ MentalFsm::MentalFsm() {
 
 	local_samplerate = 1;
 	remote_samplerate = 1;
+
+	min_samplerate = 10;
 }
 
 int MentalFsm::RegisterTimeTrigger(CBaseTrigger* trigger) {
@@ -82,9 +84,13 @@ long long MentalFsm::GetCurrentTime() {
 	return current_time;
 }
 
-int MentalFsm::RunToTime(long long new_time) {
-	//Сначала обрабатываем все изменения, которые не связаны с временем:
-	//обрабатывем цепочку триггеров, измененную сообщениями от клиента
+void MentalFsm::TouchTimeTriggers() {
+	std::vector<CBaseTrigger*>::iterator it;
+	for (it=time_triggers.begin();it!=time_triggers.end();it++)
+		(*it)->AddToDynamicTree();
+}
+
+int MentalFsm::StepToTime(long long new_time) {
 	trigger_tree_leaf* ttl = NULL;
 	//Обрабатываем триггеры с точки зрения функциональной работы
 	while (NULL != (ttl = trigger_tree->ExtractCandidate()))
@@ -92,8 +98,22 @@ int MentalFsm::RunToTime(long long new_time) {
 
 	//Пост процессинг (например, для вывода дампов)
 	while (NULL != (ttl = trigger_tree->ExtractPostprocess()))
-			ttl->trigger->PostprocessTasks();
+		ttl->trigger->PostprocessTasks();
 
+	return 0;
+}
+
+int MentalFsm::RunToTime(long long new_time) {
+	max_time_step = GetLocalSamplerate() / min_samplerate;
+	while(new_time - current_time > max_time_step) {
+		//Устанавливаем все триггеры времени
+		TouchTimeTriggers();
+
+		StepToTime(current_time+max_time_step);
+		current_time += max_time_step;
+	}
+	TouchTimeTriggers();
+	StepToTime(new_time);
 	current_time = new_time;
 	return 0;
 }
@@ -106,12 +126,20 @@ void MentalFsm::SetRemoteSamplerate(unsigned int samplerate) {
 	remote_samplerate = samplerate;
 }
 
+void MentalFsm::SetMinSamplerate(unsigned int samplerate) {
+	min_samplerate = samplerate;
+}
+
 unsigned int MentalFsm::GetLocalSamplerate() {
 	return local_samplerate;
 }
 
 unsigned int MentalFsm::GetRemoteSamplerate() {
 	return remote_samplerate;
+}
+
+unsigned int MentalFsm::GetMinSamplerate() {
+	return min_samplerate;
 }
 
 long long MentalFsm::ScaleRemoteTime(long long remote_time) {

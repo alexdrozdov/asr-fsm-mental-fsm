@@ -233,6 +233,16 @@ CNeuroState::CNeuroState(CNeuroTrigger *trigger, int nstate) {
 
 		next_states[fann_out] = next_state;
 	}
+
+	//Загружаем ограничения на время нахождения в этом состоянии
+	min_time    = (int)((long long)xmlGetDelayUsValue(xml, (mypath + "/mintime/value").c_str(), -1) * (long long)fsm->GetLocalSamplerate() / 1000000LL);
+	time_udf_ns = xmlGetIntValue(xml, (mypath + "/mintime/next_state").c_str(), 0);
+	min_time_en = xmlGetBooleanValue(xml, (mypath + "/mintime/enabled").c_str(), 0);
+
+	max_time    = (int)((long long)xmlGetDelayUsValue(xml, (mypath + "/maxtime/value").c_str(), -1) * (long long)fsm->GetLocalSamplerate() / 1000000LL);
+	time_ovf_ns = xmlGetIntValue(xml, (mypath + "/maxtime/next_state").c_str(), 0);
+	max_time_en = xmlGetBooleanValue(xml, (mypath + "/maxtime/enabled").c_str(), 0);
+	Enter();
 }
 
 void CNeuroState::evalute_fann_output() {
@@ -265,7 +275,7 @@ void CNeuroState::ProcessInputs() {
 	evalute_fann_output();
 
 	//Определяем состояние, в который перешел триггер по мнению нейронной сети
-	double max_out_val = -1000000;
+	double max_out_val = -1000000.0;
 	int next_state_id = id; //В случае чего, остаемся в этом состоянии
 	for (int i=0;i<state_count;i++) {
 		cout << " " <<  fann_output[i];
@@ -278,6 +288,9 @@ void CNeuroState::ProcessInputs() {
 
 	//Копириуем оставшиеся результаты работы сети на выходы триггера
 	copy_outputs();
+
+	//Проверяем возможность перехода из этого состояния
+	next_state_id = TryState(next_state_id);
 
 	//Проверяем возможность такого перехода в кластере
 	if (unions.size()>0) {
@@ -306,6 +319,27 @@ void CNeuroState::Enter() {
 	} else if (0 == unions.size()) {
 		trigger->neuro_union = NULL;
 	}
+
+	time_enter = fsm->GetCurrentTime();
+}
+
+int CNeuroState::TryState(int nstate) {
+	long long state_time = fsm->GetCurrentTime() - time_enter; //Время, в течение которого триггер находился в этом состоянии
+	bool stay_in_state = (id ==nstate); //Признак того, что триггер изменяет состояние
+
+	bool time_underflow = !stay_in_state && min_time_en && (state_time < min_time);
+	bool time_overflow =  max_time_en && (state_time > max_time);
+
+	if (time_underflow) {
+		//Предлагаем переход в альтернативное состояние из-за невыполнения требований по минимальной длительности
+		return time_udf_ns;
+	}
+	if (time_overflow) {
+		//Предлагаем переход в альтернативное состояние из-за превышения времни находждения в кластере
+		return time_ovf_ns;
+	}
+
+	return nstate;
 }
 
 

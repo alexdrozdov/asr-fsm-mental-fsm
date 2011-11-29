@@ -88,6 +88,7 @@ CNeuroTrigger::CNeuroTrigger(string file_name) {
 	trigger_tree->RegisterChildTrigger(tree_leaf);
 
 	fsm->RegisterTrigger(this);
+	fsm->RegisterTimeTrigger(this);
 
 	dump_enabled = false;
 	dump_to_file = false;

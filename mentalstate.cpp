@@ -394,6 +394,12 @@ int fsm_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char 
 			Tcl_SetResult(interp, (char*)ostr.str().c_str(), TCL_VOLATILE);
 			return TCL_OK;
 		}
+		if ("samplerate(min)" == cmd) {
+			ostringstream ostr;
+			ostr << fsm->GetMinSamplerate();
+			Tcl_SetResult(interp, (char*)ostr.str().c_str(), TCL_VOLATILE);
+			return TCL_OK;
+		}
 	}
 
 	if (3 == argc) {
@@ -414,9 +420,16 @@ int fsm_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char 
 			Tcl_SetResult(interp, (char*)"", TCL_STATIC);
 			return TCL_OK;
 		}
+		if ("samplerate(min)" == cmd) {
+			unsigned int samplerate = 0;
+			aux_param >> samplerate;
+			fsm->SetMinSamplerate(samplerate);
+			Tcl_SetResult(interp, (char*)"", TCL_STATIC);
+			return TCL_OK;
+		}
 	}
 
-	Tcl_SetResult(interp, (char*)"fsm - wrong params. Must be samplerate(local), samplerate(remote)", TCL_STATIC);
+	Tcl_SetResult(interp, (char*)"fsm - wrong params. Must be samplerate(local), samplerate(remote), samplerate(min)", TCL_STATIC);
 	return TCL_ERROR;
 }
 

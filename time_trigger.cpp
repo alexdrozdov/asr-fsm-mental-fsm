@@ -41,8 +41,8 @@ CTimeTrigger::CTimeTrigger(string file_name) {
 	trig_up_threshold   = xmlGetDoubleValue(xml,"/trigger/sense/max",0);
 	trig_down_threshold = xmlGetDoubleValue(xml,"/trigger/sense/min",0);
 
-	up_time   = xmlGetIntValue(xml,"/trigger/count/up",0);
-	down_time = xmlGetIntValue(xml,"/trigger/count/down",0);
+	up_time   = (int)((long long)xmlGetDelayUsValue(xml,"/trigger/count/up", -1) * (long long)fsm->GetLocalSamplerate() / 1000000LL);
+	down_time = (int)((long long)xmlGetDelayUsValue(xml,"/trigger/count/down", -1) * (long long)fsm->GetLocalSamplerate() / 1000000LL);
 
 
 	if ("combinational" == latch_type) {
