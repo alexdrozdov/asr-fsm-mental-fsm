@@ -1,8 +1,8 @@
 #ifndef __XML_CONFIG_H__
 #define __XML_CONFIG_H__
 
-#include "libxml/parser.h"
-#include "libxml/tree.h"
+#include <libxml/parser.h>
+#include <libxml/tree.h>
 
 typedef struct _xmlConfig xmlConfig;
 typedef xmlConfig *xmlConfigPtr;

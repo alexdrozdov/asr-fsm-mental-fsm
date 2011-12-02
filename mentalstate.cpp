@@ -15,7 +15,7 @@
 #include <fts.h>
 
 
-#include "tcl.h"
+#include <tcl8.5/tcl.h>
 
 #include "base_trigger.h"
 #include "time_trigger.h"

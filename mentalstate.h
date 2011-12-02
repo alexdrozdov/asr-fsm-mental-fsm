@@ -9,7 +9,7 @@
 #define MENTALSTATE_H_
 
 #include <string>
-#include "tcl.h"
+#include <tcl8.5/tcl.h>
 
 
 int init_mentalstate_structs(Tcl_Interp *interp);

@@ -76,11 +76,4 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>rings</name>
-			<type>2</type>
-			<location>/home/drozdov/speech/mental_fsm/bin/rings</location>
-		</link>
-	</linkedResources>
 </projectDescription>

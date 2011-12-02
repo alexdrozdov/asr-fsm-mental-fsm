@@ -10,12 +10,12 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <tcl8.5/tcl.h>
 
 #include <vector>
 #include <map>
 #include <string>
 
-#include "tcl.h"
 #include "base_trigger.h"
 #include "virt_trigger.h"
 

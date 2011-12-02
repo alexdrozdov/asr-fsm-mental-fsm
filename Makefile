@@ -1,8 +1,14 @@
 CCP=g++
 CCC=gcc
 CFLAGS=-Wall -c -g
-CF_TCL_H=-I ../tcl8.5.9/generic/ -I ../libxml2-2.7.8/include -I ../fann-2.1.0/src/include
-LDFLAGS=-L ../tcl8.5.9/unix/ -ltcl8.5 -L ../libxml2-2.7.8/.libs/ -L ../fann-2.1.0/src/.libs -lxml2 -lpthread -lfann
+CF_TCL_H= `pkg-config --cflags libxml-2.0` \
+          `pkg-config --cflags fann` \
+          
+
+LDFLAGS= -lpthread \
+         -ltcl8.5 \
+         `pkg-config --libs libxml-2.0` \
+         `pkg-config --libs fann`
 
 SRCS=   main.cpp \
 		mentalstate.cpp \
@@ -21,7 +27,7 @@ SRCS=   main.cpp \
 
 OBJS:=$(SRCS:%.cpp=./obj/%.o)
 
-PROG=mental_fsm.bin
+PROG=_mental_fsm.bin
 BUILD_DIR=./obj
 
 all:$(BUILD_DIR)/$(PROG)
@@ -30,15 +36,11 @@ $(BUILD_DIR)/$(PROG): dirs $(OBJS)
 	@echo [LD] $(PROG); \
 	$(CCP) $(OBJS) $(LDFLAGS) -o $(BUILD_DIR)/$(PROG)
 	@cp $(BUILD_DIR)/$(PROG) ../bin/
-	@cp ../tcl8.5.9/unix/libtcl8.5.so ../bin/
-	@cp ./mental_fsm.sh ../bin/
-	@cp ../libxml2-2.7.8/.libs/libxml2.so.2.7.8 ../bin/
-	@rm -f ../bin/libxml2.so
-	@ln -s ../bin/libxml2.so.2.7.8 ../bin/libxml2.so
 	@echo Done
 
 dirs: FORCE
 	-@if [ ! -d $(BUILD_DIR) ]; then mkdir $(BUILD_DIR); fi
+	@cp -R ./bin ../
 
 $(BUILD_DIR)/%.o: %.cpp
 	@echo [CC] $< ; \

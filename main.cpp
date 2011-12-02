@@ -11,9 +11,8 @@
 #include <iostream>
 #include <string>
 
-#include "tcl.h"
+#include <tcl8.5/tcl.h>
 #include "mentalstate.h"
-
 #include "common.h"
 
 using namespace std;
@@ -28,7 +27,6 @@ main(
     int argc,
     char **argv)
 {
-
 	if (argc < 2) {
 		cout << "main error: no project specified" << endl;
 		cout << "Use --help option for more info" << endl;

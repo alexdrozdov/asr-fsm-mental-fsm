@@ -8,9 +8,9 @@
 #ifndef NEURO_TRIGGER_H_
 #define NEURO_TRIGGER_H_
 
-#include "base_trigger.h"
-#include "floatfann.h"
+#include <floatfann.h>
 #include "fann_cpp.h"
+#include "base_trigger.h"
 
 class CNeuroTrigger; // Триггер с нейронной сетью
 class CNeuroState;   // Состояние триггера (конечного автомата)
