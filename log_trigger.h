@@ -25,6 +25,15 @@ enum ELogTriggerLastEvent {
 	logtrigger_high_overflow  = 3
 };
 
+
+typedef struct _log_trig_event_response {
+	bool enabled;
+	bool log_enabled;
+	bool feedback_enabled;
+	std::string log_text;
+	std::string feedback_text;
+} log_trig_event_response;
+
 class CLogTrigger : CBaseTrigger {
 public:
 
@@ -50,15 +59,10 @@ private:
 	double trig_up_threshold;
 	double trig_down_threshold;
 
-	std::string szMinThresholdOverflow;
-	std::string szMinThresholdUnderflow;
-	std::string szMaxThresholdOverflow;
-	std::string szMaxThresholdUnderflow;
-
-	bool lowbound_trigup;
-	bool lowbound_trigdown;
-	bool highbound_trigup;
-	bool highbound_trigdown;
+	log_trig_event_response min_threshold_overflow;
+	log_trig_event_response min_threshold_underflow;
+	log_trig_event_response max_threshold_overflow;
+	log_trig_event_response max_threshold_underflow;
 
 	int current_state;
 	int last_event;

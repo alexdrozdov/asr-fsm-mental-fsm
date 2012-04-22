@@ -41,17 +41,32 @@ CLogTrigger::CLogTrigger(string file_name) {
 	trig_up_threshold       = xmlGetDoubleValue(xml,"/trigger/messages/high_threshold/value",0);
 	trig_down_threshold     = xmlGetDoubleValue(xml,"/trigger/messages/low_threshold/value",0);
 
-	//Загружаем сообщения, которые должны формироваться для каждого и порогов и направлений перехода
-	szMaxThresholdOverflow  = xmlGetStringValue(xml,"/trigger/messages/high_threshold/up");
-	szMaxThresholdUnderflow = xmlGetStringValue(xml,"/trigger/messages/high_threshold/down");
-	szMinThresholdOverflow  = xmlGetStringValue(xml,"/trigger/messages/low_threshold/up");
-	szMinThresholdUnderflow = xmlGetStringValue(xml,"/trigger/messages/low_threshold/down");
-
 	//Определяем, по каким порогам должны срабатывать триггеры
-	highbound_trigup   = xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/up/enabled",false);
-	highbound_trigdown = xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/down/enabled",false);
-	lowbound_trigup    = xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/up/enabled",false);
-	lowbound_trigdown  = xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/down/enabled",false);
+	max_threshold_overflow.enabled   = xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/up/enabled",false);
+	max_threshold_underflow.enabled  = xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/down/enabled",false);
+	min_threshold_overflow.enabled   = xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/up/enabled",false);
+	min_threshold_underflow.enabled  = xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/down/enabled",false);
+
+	max_threshold_overflow.log_enabled  = max_threshold_overflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/up/enable_log",false);
+	max_threshold_underflow.log_enabled = max_threshold_underflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/down/enable_log",false);
+	min_threshold_overflow.log_enabled  = min_threshold_overflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/up/enable_log",false);
+	min_threshold_underflow.log_enabled = min_threshold_underflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/down/enable_log",false);
+
+	max_threshold_overflow.feedback_enabled  = max_threshold_overflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/up/enable_feedback",false);
+	max_threshold_underflow.feedback_enabled = max_threshold_underflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/high_threshold/down/enable_feedback",false);
+	min_threshold_overflow.feedback_enabled  = min_threshold_overflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/up/enable_feedback",false);
+	min_threshold_underflow.feedback_enabled = min_threshold_underflow.enabled && xmlGetBooleanValue(xml,"/trigger/messages/low_threshold/down/enable_feedback",false);
+
+	//Загружаем сообщения, которые должны формироваться для каждого и порогов и направлений перехода
+	max_threshold_overflow.log_text  = xmlGetStringValueSafe(xml,"/trigger/messages/high_threshold/up","");
+	max_threshold_underflow.log_text = xmlGetStringValueSafe(xml,"/trigger/messages/high_threshold/down","");
+	min_threshold_overflow.log_text  = xmlGetStringValueSafe(xml,"/trigger/messages/low_threshold/up","");
+	min_threshold_underflow.log_text = xmlGetStringValueSafe(xml,"/trigger/messages/low_threshold/down","");
+
+	max_threshold_overflow.feedback_text  = xmlGetStringValueSafe(xml,"/trigger/messages/high_threshold/up/feedback","");
+	max_threshold_underflow.feedback_text = xmlGetStringValueSafe(xml,"/trigger/messages/high_threshold/down/feedback","");
+	min_threshold_overflow.feedback_text  = xmlGetStringValueSafe(xml,"/trigger/messages/low_threshold/up/feedback","");
+	min_threshold_underflow.feedback_text = xmlGetStringValueSafe(xml,"/trigger/messages/low_threshold/down/feedback","");
 
 	//Задаем начальное состояние триггера. Чтобы избежать лишних сообщений
 	//при загрузке помечаем его состояние как неопределенное.
@@ -189,20 +204,28 @@ void CLogTrigger::ProcessAnchestors() {
 		}
 		switch (last_event) {
 			case logtrigger_low_underflow:
-				if (lowbound_trigdown)
-					cout << szMinThresholdUnderflow << endl;
+				if (min_threshold_underflow.log_enabled)
+					cout << min_threshold_underflow.log_text << endl;
+				if (min_threshold_underflow.feedback_enabled)
+					fsm->SendResponse(min_threshold_underflow.feedback_text);
 				break;
 			case logtrigger_low_overflow:
-				if (lowbound_trigup)
-					cout << szMinThresholdOverflow << endl;
+				if (min_threshold_overflow.log_enabled)
+					cout << min_threshold_overflow.log_text << endl;
+				if (min_threshold_overflow.feedback_enabled)
+					fsm->SendResponse(min_threshold_overflow.feedback_text);
 				break;
 			case logtrigger_high_underflow:
-				if (highbound_trigdown)
-					cout << szMaxThresholdUnderflow << endl;
+				if (max_threshold_underflow.log_enabled)
+					cout << max_threshold_underflow.log_text << endl;
+				if (max_threshold_underflow.feedback_enabled)
+					fsm->SendResponse(max_threshold_underflow.feedback_text);
 				break;
 			case logtrigger_high_overflow:
-				if (highbound_trigup)
-					cout << szMaxThresholdOverflow << endl;
+				if (max_threshold_overflow.log_enabled)
+					cout << max_threshold_overflow.log_text << endl;
+				if (max_threshold_overflow.feedback_enabled)
+					fsm->SendResponse(max_threshold_overflow.feedback_text);
 				break;
 			default:
 				break;
@@ -214,26 +237,34 @@ void CLogTrigger::ProcessAnchestors() {
 	switch (new_trigger_state) {
 		case logtrigger_underflow:
 			//Триггер перешел в низшее
-			if (lowbound_trigdown)
-				cout << szMinThresholdUnderflow << endl;
+			if (min_threshold_underflow.log_enabled)
+				cout << min_threshold_underflow.log_text << endl;
+			if (min_threshold_underflow.feedback_enabled)
+				fsm->SendResponse(min_threshold_underflow.feedback_text);
 			last_event = logtrigger_low_underflow;
 			break;
 		case logtrigger_inrange:
 			if (current_state<new_trigger_state) {
 				//Текущее состояние триггера было ниже нового. Значит, триггер перешел нижнюю границу
-				if (lowbound_trigup)
-					cout << szMinThresholdOverflow << endl;
+				if (min_threshold_overflow.log_enabled)
+					cout << min_threshold_overflow.log_text << endl;
+				if (min_threshold_overflow.feedback_enabled)
+					fsm->SendResponse(min_threshold_overflow.feedback_text);
 				last_event = logtrigger_low_overflow;
 			} else {
 				//Текущее состояние триггера было выше нового. Значит, триггер перешел верхнюю границу
-				if (highbound_trigdown)
-					cout << szMaxThresholdUnderflow << endl;
+				if (max_threshold_underflow.log_enabled)
+					cout << max_threshold_underflow.log_text << endl;
+				if (max_threshold_underflow.feedback_enabled)
+					fsm->SendResponse(max_threshold_underflow.feedback_text);
 				last_event = logtrigger_high_underflow;
 			}
 			break;
 		case logtrigger_overflow:
-			if (highbound_trigup)
-				cout << szMaxThresholdOverflow << endl;
+			if (max_threshold_overflow.log_enabled)
+				cout << max_threshold_overflow.log_text << endl;
+			if (max_threshold_overflow.feedback_enabled)
+				fsm->SendResponse(max_threshold_overflow.feedback_text);
 			last_event = logtrigger_high_overflow;
 			break;
 		default:

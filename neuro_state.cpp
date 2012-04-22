@@ -26,7 +26,8 @@ CNeuroState::CNeuroState(CNeuroTrigger *trigger, int nstate) {
 	std::ostringstream stream;
 	stream << nstate;
 	string mypath = "/trigger/states/i" + stream.str();
-	cout << "\tCNeuroState::CNeuroState info - loading state from " << mypath << endl;
+	//FIXME Добавить контроль детализации
+	//cout << "\tCNeuroState::CNeuroState info - loading state from " << mypath << endl;
 
 	szCaption = xmlGetStringValue(xml, (mypath + "/caption").c_str());
 
@@ -278,13 +279,13 @@ void CNeuroState::ProcessInputs() {
 	double max_out_val = -1000000.0;
 	int next_state_id = id; //В случае чего, остаемся в этом состоянии
 	for (int i=0;i<state_count;i++) {
-		cout << " " <<  fann_output[i];
+		// FIXME Обеспечить настройки отображения результатов cout << " " <<  fann_output[i];
 		if (fann_output[i] > max_out_val) {
 			max_out_val = fann_output[i];
 			next_state_id = i;
 		}
 	}
-	cout << endl;
+	//cout << endl;
 
 	//Копириуем оставшиеся результаты работы сети на выходы триггера
 	copy_outputs();

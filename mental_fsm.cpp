@@ -8,6 +8,7 @@
 #include <iostream>
 #include "mental_fsm.h"
 #include "trigger_tree.h"
+#include "net_link.h"
 
 using namespace std;
 
@@ -70,6 +71,43 @@ int MentalFsm::RegisterTrigger(CBaseTrigger* trigger) {
 	triggers.push_back(trigger);
 	trig_dict[trigger->szTriggerName] = trigger;
 	return triggers.size() - 1;
+}
+
+bool MentalFsm::UnregisterTrigger(CBaseTrigger* trigger) {
+	if (NULL == trigger) {
+		cout << "MentalFsm::UnregisterTrigger error. Null ptr to trigger" << endl;
+		return false;
+	}
+
+	//Находим триггер среди зарегистрированных
+	vector<CBaseTrigger*>::iterator it;
+	for ( it=triggers.begin() ; it < triggers.end(); it++ ) {
+		if (trigger != *it) continue;
+		triggers.erase(it);
+		break;
+	}
+
+	//Удаляем его имя
+	trig_dict.erase(trigger->szTriggerName);
+
+	//При необходимости удаляем из списка триггеров времени
+	for ( it=time_triggers.begin() ; it < time_triggers.end(); it++ ) {
+		if (trigger != *it) continue;
+		time_triggers.erase(it);
+		break;
+	}
+
+	//Удаляем его самого
+	delete trigger;
+	return true;
+}
+
+bool MentalFsm::UnregisterTrigger(std::string name) {
+	CBaseTrigger* tr = FindTrigger(name);
+	if (NULL == tr)
+		return false;
+
+	return UnregisterTrigger(tr);
 }
 
 CBaseTrigger* MentalFsm::FindTrigger(std::string name) {
@@ -144,6 +182,10 @@ unsigned int MentalFsm::GetMinSamplerate() {
 
 long long MentalFsm::ScaleRemoteTime(long long remote_time) {
 	return remote_time * local_samplerate / remote_samplerate;
+}
+
+void MentalFsm::SendResponse(std::string response_text) {
+	net_link->SendTextResponse(response_text);
 }
 
 

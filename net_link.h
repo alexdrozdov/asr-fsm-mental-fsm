@@ -25,7 +25,8 @@ enum ENetlinkMsgType {
 	nlmt_time = 2,       // Информация о переключении времени
 	nlmt_trig = 3,       // Информация о переключении триггеров в текущем такте
 	nlmt_tcl = 4,        // tcl-команда. Предполагает ответ сервера
-	nlmt_trig_manage = 5 // Управление работой триггеров клиента
+	nlmt_trig_manage = 5,// Управление работой триггеров клиента
+	nlmt_text = 6        // Передача текстового отчета от сервера клиенту. Может интерпретироваться по соглашению клиента и сервера
 };
 
 enum ENetlinkLinkType {
@@ -44,6 +45,11 @@ enum EBufProcessState {
 	bps_end     = 4
 };
 
+typedef struct _netlink_header {
+	int msg_type;
+	int msg_length;
+} netlink_hdr;
+
 #define FRAME_START  0xFB
 #define FRAME_END    0xFE
 #define FRAME_ESCAPE 0xFC
@@ -52,6 +58,8 @@ enum EBufProcessState {
 #define MAX_RCV_BUF 10000
 //Количество принимающих буферов
 #define RCV_BUF_COUNT 10
+
+#define MAX_QUEUE_SIZE 200
 
 typedef struct _time_msg {
 	long long current_time;
@@ -80,6 +88,25 @@ typedef struct _netlink_msg {
 	char* msg_data;
 } netlink_msg;
 
+//Прототип класса, отправляемого через netlink
+class NetlinkMessage {
+public:
+	virtual ~NetlinkMessage();
+	virtual int RequiredSize() = 0;
+	virtual void Dump(unsigned char* space) = 0;
+	virtual void Clear() = 0;
+};
+
+//Структура описывает буфер, готовый к отправке через Netlink
+typedef struct _send_message_struct {
+	unsigned char* data;
+	int length;
+} send_message_struct, *psend_message_struct;
+
+
+void* netlinksender_thread_function (void* thread_arg);
+
+
 class CNetLink {
 public:
 	CNetLink(std::string filename);
@@ -91,6 +118,12 @@ public:
 	virtual int BeginListen();
 	virtual int Accept();
 	virtual int CloseConnection();
+
+	int MkDump(bool enable);
+	int MkDump(bool enable, std::string file_name);
+
+	virtual void SendTextResponse(std::string response_text);
+	int Send(NetlinkMessage* msg);
 private:
 	int listener;
 	int port_number;
@@ -121,6 +154,31 @@ private:
 	std::map<std::string,CVirtTrigger*> by_name;
 
 	bool dump_instream;
+
+	//Методы и члены, обеспечивающие передачу данных по обратному каналу
+	int send_queue_size;
+	pthread_mutex_t send_queue_mutex;
+	pthread_cond_t  send_queue_cv;
+
+	pthread_mutex_t to_send_mutex;
+	std::queue<send_message_struct> to_send;
+
+	int coded_length[256];
+	unsigned int outcomming;
+
+	bool dump_enabled;
+	bool dump_to_file;
+	std::ofstream dump_stream; //Поток, в который выводится дамп
+
+	int thread_function();
+	void initialize_send_queue();
+	void set_queue_size(int queue_size, bool signal_change);
+	void incr_queue_size();
+	void decr_queue_size();
+
+	int pack_n_send(send_message_struct sms);
+
+	friend void* netlinksender_thread_function (void* thread_arg);
 };
 
 extern CNetLink *net_link;

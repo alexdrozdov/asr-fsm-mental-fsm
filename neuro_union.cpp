@@ -23,7 +23,7 @@ CNeuroUnion::CNeuroUnion(CNeuroTrigger *trigger, int nunion) {
 	std::ostringstream stream;
 	stream << nunion;
 	string mypath = "/trigger/unions/i" + stream.str();
-	cout << "\tCNeuroUnion::CNeuroUnion info - loading union from " << mypath << endl;
+	//cout << "\tCNeuroUnion::CNeuroUnion info - loading union from " << mypath << endl; //FIXME Добавить уровень детализации
 
 
 	//Идентификатор объединения. По идее, должен совпадать с nstate, но это уже на совести программиста ASR

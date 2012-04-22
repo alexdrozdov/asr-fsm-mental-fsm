@@ -19,6 +19,9 @@ public:
 
 	int RegisterTrigger(CBaseTrigger* trigger);
 	int RegisterTimeTrigger(CBaseTrigger* trigger);
+	bool UnregisterTrigger(CBaseTrigger* trigger);
+	bool UnregisterTrigger(std::string name);
+
 	CBaseTrigger* FindTrigger(std::string name);
 
 	long long GetCurrentTime();
@@ -33,6 +36,8 @@ public:
 	unsigned int GetMinSamplerate();
 
 	long long ScaleRemoteTime(long long remote_time);
+
+	void SendResponse(std::string response_text);
 private:
 
 	int StepToTime(long long new_time);

@@ -25,6 +25,7 @@
 #include "mental_fsm.h"
 #include "trigger_tree.h"
 #include "net_link.h"
+#include "pcre_trigger.h"
 
 #include "xml_config.h"
 
@@ -47,7 +48,7 @@ int init_trigger_handles() {
 	load_trigger_handlers["log"]    = (trigger_init_ptr)load_log_trigger;
 	load_trigger_handlers["virt"]   = (trigger_init_ptr)load_virt_trigger;
 	load_trigger_handlers["neuro"]  = (trigger_init_ptr)load_neuro_trigger;
-
+	load_trigger_handlers["pcre"]   = (trigger_init_ptr)load_pcre_trigger;
 	return 0;
 }
 
@@ -238,8 +239,9 @@ int load_trigger(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 		cout << "\tError: handler for this trigger type wasn`t registered" << endl;
 	} else {
 		trigger_init_ptr tip = load_trigger_handlers[trigger_type];
-		CBaseTrigger* trig = (CBaseTrigger*)tip(full_xml_name);
-		cout << "\tOK: trigger <" << trig->szTriggerName << "> loaded" << endl;
+		tip(full_xml_name);
+		//CBaseTrigger* trig = (CBaseTrigger*)tip(full_xml_name);
+		//cout << "\tOK: trigger <" << trig->szTriggerName << "> loaded" << endl;
 	}
 	return TCL_OK;
 }

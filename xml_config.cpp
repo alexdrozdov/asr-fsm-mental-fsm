@@ -208,6 +208,13 @@ char* xmlGetStringValue(xmlConfigPtr xml, const char* path) {
 	return szPathValue;
 }
 
+char* xmlGetStringValueSafe(xmlConfigPtr xml, const char* path, const char* def) {
+	if (xmlValidatePath(xml, path)) {
+		return xmlGetStringValue(xml, path);
+	}
+	return (char*)def;
+}
+
 int xmlGetIntValue(xmlConfigPtr xml, const char* path, int def) {
 	char* szVal = xmlGetStringValue(xml,path);
 	if (NULL == szVal) {

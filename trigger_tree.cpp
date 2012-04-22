@@ -7,6 +7,7 @@
 
 #include "trigger_tree.h"
 #include "base_trigger.h"
+#include "mental_fsm.h"
 
 using namespace std;
 
@@ -66,6 +67,8 @@ int CTriggerTree::BuildTree() {
 			static_tree[tl->distance]->push_back(tl);
 		} else {
 			cout << "CTriggerTree::BuildTree warning - " << tl->trigger->szTriggerName << " is out of hierarhy" << endl;
+			cout << "It will be removed from trigger tree" << endl;
+			fsm->UnregisterTrigger(tl->trigger);
 		}
 	}
 	cout << "\tcomplete" << endl;

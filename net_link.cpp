@@ -10,6 +10,7 @@
 #include <vector>
 #include <string>
 #include <stdlib.h>
+#include <string.h>
 
 #include <errno.h>
 #include <sys/types.h>
@@ -23,9 +24,11 @@
 
 #include <pthread.h>
 
+#include "crc.h"
 
 #include "net_link.h"
 #include "mental_fsm.h"
+#include "back_messages.h"
 
 using namespace std;
 
@@ -40,6 +43,17 @@ CNetLink::CNetLink(string filename) {
 	cur_buf_usage = 0;
 
 	dump_instream = false;
+
+	//Заполняем таблицу длин кодированных символов
+	for (int i=0;i<256;i++) {
+		coded_length[i] = 1;
+	}
+	coded_length[FRAME_START]  = 2;
+	coded_length[FRAME_END]    = 2;
+	coded_length[FRAME_ESCAPE] = 2;
+
+	dump_enabled = false;
+	dump_to_file = false;
 }
 
 int CNetLink::OpenConection() {
@@ -125,7 +139,7 @@ int CNetLink::accept_thread() {
 			close(listener);
 			online = false;
 			listen_active = false;
-			cout << "CNetLink::accept_thread info - listening socket closed" << endl;
+			//cout << "CNetLink::accept_thread info - listening socket closed" << endl;
 			close(STDIN_FILENO);
 
 			handle_network();
@@ -141,10 +155,18 @@ int CNetLink::accept_thread() {
 int CNetLink::handle_network() {
 	unsigned char buf[1024];
 
+	//Включаем управление очередью
+	initialize_send_queue();
+	pthread_mutex_init(&to_send_mutex, NULL);
+
+	//Запускаем поток, обеспечивающий обратный канал связи
+	pthread_t thread_id;
+	pthread_create(&thread_id, NULL, &netlinksender_thread_function, this);
+
 	while(true) {
 		int bytes_read = read(sock, buf, 1024);
 		if(bytes_read <= 0) {
-			cout << errno << endl;
+			//cout << errno << endl;
 			cout << "CNetLink::accept_thread info - child disconnected with code "<< errno << endl;
 			break;
 		}
@@ -152,7 +174,7 @@ int CNetLink::handle_network() {
 	}
 
 	close(sock);
-	cout << "Will now exit" << endl;
+	//cout << "Will now exit" << endl;
 	exit(0);
 
 	return 0;
@@ -425,6 +447,211 @@ int CNetLink::CloseConnection() {
 	return 0;
 }
 
+void CNetLink::SendTextResponse(std::string response_text) {
+	NetlinkMessageString* nms = new NetlinkMessageString(response_text);
+	Send(nms);
+	delete nms;
+}
+
+
+void CNetLink::set_queue_size(int queue_size, bool signal_change) {
+	/* Lock the mutex before accessing the flag value.  */
+	pthread_mutex_lock(&send_queue_mutex);
+
+	/* Set the flag value, and then signal in case thread_function is
+	blocked, waiting for the flag to become set.  However,
+	thread_function can’t actually check the flag until the mutex is
+	unlocked.  */
+
+	send_queue_size = queue_size;
+	if (signal_change) {
+		pthread_cond_signal(&send_queue_cv);
+	}
+	/* Unlock the mutex.  */
+	pthread_mutex_unlock(&send_queue_mutex);
+}
+
+void CNetLink::incr_queue_size() {
+	bool overflow = false;
+	/* Lock the mutex before accessing the flag value.  */
+	pthread_mutex_lock(&send_queue_mutex);
+
+	if (send_queue_size >= MAX_QUEUE_SIZE) {
+		overflow = true;
+	} else {
+		send_queue_size++;
+		pthread_cond_signal(&send_queue_cv);
+	}
+	pthread_mutex_unlock(&send_queue_mutex);
+
+	if ( overflow ) {
+		cout << "NetlinkSender error - message queue overflow. Will now exit" << endl;
+		exit(3);
+	}
+}
+
+void CNetLink::decr_queue_size() {
+	/* Lock the mutex before accessing the flag value.  */
+	pthread_mutex_lock(&send_queue_mutex);
+
+	if (send_queue_size > 0) {
+		send_queue_size--;
+	}
+	pthread_mutex_unlock(&send_queue_mutex);
+}
+
+
+void CNetLink::initialize_send_queue() {
+	pthread_mutex_init (&send_queue_mutex, NULL);
+	pthread_cond_init (&send_queue_cv, NULL);
+
+	send_queue_size = 0;
+}
+
+int CNetLink::Send(NetlinkMessage* msg) {
+	if (NULL == msg) {
+		cout << "NetlinkSender::Send error - zero pointer received" << endl;
+	}
+
+	//Извлекаем данные, которые необходимо передать
+	send_message_struct sms;
+	sms.length = msg->RequiredSize();
+	sms.data   = (unsigned char*)malloc(sms.length);
+	msg->Dump(sms.data);
+
+	//Записываем эти данные в очередь на отправку
+	pthread_mutex_lock(&to_send_mutex);
+	to_send.push(sms);
+	pthread_mutex_unlock(&to_send_mutex);
+
+	//Увеличиваем размер очереди
+	incr_queue_size();
+
+	if (dump_enabled && dump_to_file) {
+		dump_stream << "push " << send_queue_size << endl;
+	} else if (dump_enabled) {
+		cout << "push " << send_queue_size << endl;
+	}
+
+	return 0;
+}
+
+
+int CNetLink::thread_function() {
+	while (1) {
+		/* Lock the mutex before accessing the flag value.  */
+		pthread_mutex_lock (&send_queue_mutex);
+		while (0 == send_queue_size) {
+			/* The flag is clear.  Wait for a signal on the condition
+			variable, indicating that the flag value has changed.  When the
+			signal arrives and this thread unblocks, loop and check the
+			flag again.  */
+			pthread_cond_wait (&send_queue_cv, &send_queue_mutex);
+		}
+		/* When we’ve gotten here, we know the flag must be set.  Unlock
+		the mutex.*/
+		pthread_mutex_unlock (&send_queue_mutex);
+
+		pthread_mutex_lock(&to_send_mutex);
+		send_message_struct sms = to_send.front();
+		to_send.pop();
+		pthread_mutex_unlock(&to_send_mutex);
+		//Уменьшаем размер очереди
+		decr_queue_size();
+
+		pack_n_send(sms);
+
+		if (dump_enabled && dump_to_file) {
+			dump_stream << "pop " << send_queue_size << endl;
+		} else if (dump_enabled) {
+			cout << "pop " << send_queue_size << endl;
+		}
+	}
+	return 0;
+}
+
+int CNetLink::pack_n_send(send_message_struct sms) {
+	//Определяем длину сообщения после его кодирования
+	int msg_len = 0;
+	for (int i=0;i<sms.length;i++) {
+		msg_len += coded_length[sms.data[i]];
+	}
+	msg_len += 4; // FRAME_START + CRC-16 + FRAME_END
+
+	unsigned char *coded_msg = (unsigned char*)malloc(msg_len);
+	unsigned char *pcoded_msg = coded_msg;
+
+	*pcoded_msg = FRAME_START;
+	pcoded_msg++;
+
+	unsigned short crc = CRC_INIT;
+
+	for (int i=0;i<sms.length;i++) {
+		unsigned char c = sms.data[i];
+		CRC(crc, c);
+		if (FRAME_START == c) {
+			pcoded_msg[0] = FRAME_ESCAPE;
+			pcoded_msg[1] = 0xCB;
+			pcoded_msg += 2;
+			continue;
+		}
+		if (FRAME_END == c) {
+			pcoded_msg[0] = FRAME_ESCAPE;
+			pcoded_msg[1] = 0xCE;
+			pcoded_msg += 2;
+			continue;
+		}
+		if (FRAME_ESCAPE == c) {
+			pcoded_msg[0] = FRAME_ESCAPE;
+			pcoded_msg[1] = FRAME_ESCAPE;
+			pcoded_msg += 2;
+			continue;
+		}
+		pcoded_msg[0] = c;
+		pcoded_msg++;
+	}
+	free(sms.data);
+
+	coded_msg[msg_len-3] = 0;//(crc&0xFF00) >> 8;
+	coded_msg[msg_len-2] = 0;//crc & 0xFF;
+	coded_msg[msg_len-1] = FRAME_END;
+
+	if (dump_enabled && dump_to_file) {
+		char ch[6];
+		for (int i=0;i<msg_len;i++) {
+			sprintf(ch,"0x%X",coded_msg[i]);
+			dump_stream << ch << " ";
+		}
+		dump_stream << endl;
+	} else if (dump_enabled) {
+		char ch[6];
+		for (int i=0;i<msg_len;i++) {
+			sprintf(ch,"0x%X",coded_msg[i]);
+			cout << ch << " ";
+		}
+		cout << endl;
+	}
+
+
+	int send_res = send(sock, coded_msg, msg_len, 0);//MSG_DONTWAIT);
+	free(coded_msg);
+	if (-1 == send_res) {
+		if (EAGAIN == errno) {
+			cout << "CNetLink::pack_n_send error - socket overflow" << endl;
+		} else {
+			cout << "CNetLink::pack_n_send error - " << errno << endl;
+			cout << strerror(errno) << endl;
+			cout << "Will now exit" << endl;
+			exit(3);
+		}
+	}
+
+	outcomming += msg_len;
+
+	return 0;
+}
+
+
 int CNetLink::RegisterVirtualTrigger(CVirtTrigger* trigger) {
 	if (NULL == trigger) {
 		cout << "CNetLink::RegisterVirtualTrigger error - null pointer to trigger" << endl;
@@ -457,6 +684,39 @@ int CNetLink::RegisterVirtualTrigger(CVirtTrigger* trigger) {
 
 	return 0;
 }
+
+int CNetLink::MkDump(bool enable) {
+	if (dump_enabled) {
+		//Дамп и так выводится. Закрываем существующий дескрптор
+		if (dump_stream != cout) {
+			dump_stream.close();
+		}
+	}
+	dump_enabled = enable;
+	dump_to_file = false;
+	return 0;
+}
+
+int CNetLink::MkDump(bool enable, string file_name) {
+	if (dump_enabled) {
+		//Дамп и так выводится. Закрываем существующий дескриптор
+		if (dump_stream != cout) {
+			dump_stream.close();
+		}
+	}
+
+	dump_enabled = enable;
+	if (dump_enabled) {
+		if ("cout" == file_name) {
+			dump_to_file = false;
+		} else {
+			dump_to_file = true;
+			dump_stream.open(file_name.c_str());
+		}
+	}
+	return 0;
+}
+
 
 int CNetLink::TclHandler(Tcl_Interp* interp, int argc, CONST char *argv[]) {
 	if (1==argc) {
@@ -510,7 +770,7 @@ int CNetLink::TclHandler(Tcl_Interp* interp, int argc, CONST char *argv[]) {
 			return TCL_OK;
 		}
 	}
-	if (3==argc) {
+	if (3<=argc) {
 		string cmd_op = argv[1];
 		string cmd_pr = argv[2];
 		if ("dump_instream" == cmd_op) {
@@ -523,6 +783,26 @@ int CNetLink::TclHandler(Tcl_Interp* interp, int argc, CONST char *argv[]) {
 				cout << "OK" << endl;
 				return TCL_OK;
 			}
+		}
+		if ("dump_ostream" == cmd_op) {
+			bool bdump_enable = false;
+			if (cmd_pr == "enable") {
+				bdump_enable = true;
+			}
+
+			bool bfile_name = false;
+			string file_name = "";
+			if (argc > 3 ) {
+				bfile_name = true;
+				file_name = argv[3];
+			}
+
+			if (!bfile_name) {
+				MkDump(bdump_enable);
+			} else {
+				MkDump(bdump_enable, file_name);
+			}
+			return TCL_OK;
 		}
 	}
 	cout << "Unknown command operands" << endl;
@@ -541,6 +821,13 @@ int create_net_link(std::string filename) {
 void* netlink_accept_thread (void* thread_arg) {
 	CNetLink* nl = (CNetLink*) thread_arg;
 	nl->accept_thread();
+
+	return NULL;
+}
+
+void* netlinksender_thread_function (void* thread_arg) {
+	CNetLink* nls = (CNetLink*) thread_arg;
+	nls->thread_function();
 
 	return NULL;
 }
