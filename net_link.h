@@ -181,7 +181,6 @@ private:
 	friend void* netlinksender_thread_function (void* thread_arg);
 };
 
-extern CNetLink *net_link;
 extern int create_net_link(std::string filename);
 extern void* netlink_accept_thread (void* thread_arg);
 

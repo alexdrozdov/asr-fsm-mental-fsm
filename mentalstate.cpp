@@ -18,16 +18,13 @@
 #include <tcl8.5/tcl.h>
 
 #include "base_trigger.h"
-#include "time_trigger.h"
-#include "log_trigger.h"
 #include "virt_trigger.h"
-#include "neuro_trigger.h"
 #include "mental_fsm.h"
 #include "trigger_tree.h"
 #include "net_link.h"
-#include "pcre_trigger.h"
-
 #include "xml_config.h"
+#include "global_vars.h"
+#include "trigger_loader.h"
 
 using namespace std;
 
@@ -39,16 +36,13 @@ int tree_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 int mkdump_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int fsm_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int triggers_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
+int triglib_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 
-typedef CBaseTrigger* (*trigger_init_ptr)(std::string);
-
-map<string,trigger_init_ptr> load_trigger_handlers;
-int init_trigger_handles() {
-	load_trigger_handlers["time"]   = (trigger_init_ptr)load_time_trigger;
-	load_trigger_handlers["log"]    = (trigger_init_ptr)load_log_trigger;
+int init_trigger_handles(Tcl_Interp *interp) {
 	load_trigger_handlers["virt"]   = (trigger_init_ptr)load_virt_trigger;
-	load_trigger_handlers["neuro"]  = (trigger_init_ptr)load_neuro_trigger;
-	load_trigger_handlers["pcre"]   = (trigger_init_ptr)load_pcre_trigger;
+
+	string tcl_command = "source " + project_path + "triggers/load.tcl";
+	Tcl_Eval(interp,tcl_command.c_str());
 	return 0;
 }
 
@@ -211,10 +205,17 @@ int init_mentalstate_structs(Tcl_Interp *interp) {
 			(Tcl_CmdDeleteProc*) NULL
 	);
 
+	Tcl_CreateCommand(interp,
+			"triglib",
+			triglib_handler,
+			(ClientData) NULL,
+			(Tcl_CmdDeleteProc*) NULL
+	);
+
 
 	fsm = new MentalFsm();
-	init_trigger_handles();
 	create_trigger_tree();
+	init_trigger_handles(interp);
 	create_net_link(project_path + "netlink.xml");
 
 	Tcl_SetVar(interp, "mental_fsm(loaded)", "1",TCL_GLOBAL_ONLY);
@@ -248,6 +249,20 @@ int load_trigger(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 
 int trigger_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
 	return TCL_OK;
+}
+
+int triglib_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
+	if (4 == argc) {
+		string cmd = argv[1];
+		string name = argv[2];
+		string libname = argv[3];
+
+		if ("load" == cmd) {
+			return  load_trigger_lib(name,libname);
+		}
+	}
+	cout << "proclib_handler error: wrong options" << endl;
+	return TCL_ERROR;
 }
 
 int parse_inout_spec (string spec, trig_inout_spec* spec_struct) {

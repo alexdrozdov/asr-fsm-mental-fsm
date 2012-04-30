@@ -8,6 +8,7 @@
 #include "trigger_tree.h"
 #include "base_trigger.h"
 #include "mental_fsm.h"
+#include "global_vars.h"
 
 using namespace std;
 

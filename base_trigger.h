@@ -89,6 +89,6 @@ public:
 	std::ofstream dump_stream; //Поток, в который выводится дамп
 };
 
-
+typedef CBaseTrigger* (*trigger_init_ptr)(std::string);
 
 #endif /* BASE_TRIGGER_H_ */

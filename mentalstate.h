@@ -14,7 +14,5 @@
 
 int init_mentalstate_structs(Tcl_Interp *interp);
 
-extern std::string executable_path;
-extern std::string project_path;
 
 #endif /* MENTALSTATE_H_ */

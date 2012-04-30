@@ -17,31 +17,31 @@ class MentalFsm {
 public:
 	MentalFsm();
 
-	int RegisterTrigger(CBaseTrigger* trigger);
-	int RegisterTimeTrigger(CBaseTrigger* trigger);
-	bool UnregisterTrigger(CBaseTrigger* trigger);
-	bool UnregisterTrigger(std::string name);
+	virtual int RegisterTrigger(CBaseTrigger* trigger);
+	virtual int RegisterTimeTrigger(CBaseTrigger* trigger);
+	virtual bool UnregisterTrigger(CBaseTrigger* trigger);
+	virtual bool UnregisterTrigger(std::string name);
 
-	CBaseTrigger* FindTrigger(std::string name);
+	virtual CBaseTrigger* FindTrigger(std::string name);
 
-	long long GetCurrentTime();
-	int RunToTime(long long new_time);
+	virtual long long GetCurrentTime();
+	virtual int RunToTime(long long new_time);
 
-	void SetLocalSamplerate(unsigned int samplerate);
-	void SetRemoteSamplerate(unsigned int samplerate);
-	void SetMinSamplerate(unsigned int samplerate);
+	virtual void SetLocalSamplerate(unsigned int samplerate);
+	virtual void SetRemoteSamplerate(unsigned int samplerate);
+	virtual void SetMinSamplerate(unsigned int samplerate);
 
-	unsigned int GetLocalSamplerate();
-	unsigned int GetRemoteSamplerate();
-	unsigned int GetMinSamplerate();
+	virtual unsigned int GetLocalSamplerate();
+	virtual unsigned int GetRemoteSamplerate();
+	virtual unsigned int GetMinSamplerate();
 
-	long long ScaleRemoteTime(long long remote_time);
+	virtual long long ScaleRemoteTime(long long remote_time);
 
-	void SendResponse(std::string response_text);
+	virtual void SendResponse(std::string response_text);
 private:
 
-	int StepToTime(long long new_time);
-	void TouchTimeTriggers();
+	virtual int StepToTime(long long new_time);
+	virtual void TouchTimeTriggers();
 
 	long long current_time;
 	unsigned int local_samplerate;
@@ -56,10 +56,6 @@ private:
 	std::map<std::string ,CBaseTrigger*> trig_dict; //Триггеры по их именам
 };
 
-extern MentalFsm* fsm;
-
-extern std::string executable_path;
-extern std::string project_path;
 
 
 #endif /* MENTAL_FSM_H_ */

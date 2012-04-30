@@ -9,6 +9,7 @@
 #include "mental_fsm.h"
 #include "trigger_tree.h"
 #include "net_link.h"
+#include "global_vars.h"
 
 using namespace std;
 

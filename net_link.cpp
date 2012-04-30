@@ -29,6 +29,7 @@
 #include "net_link.h"
 #include "mental_fsm.h"
 #include "back_messages.h"
+#include "global_vars.h"
 
 using namespace std;
 

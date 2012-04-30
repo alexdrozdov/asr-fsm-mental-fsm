@@ -29,15 +29,15 @@ class CTriggerTree {
 public:
 	CTriggerTree();
 
-	void RegisterRootTrigger(trigger_tree_leaf* trigger_leaf);
-	void RegisterChildTrigger(trigger_tree_leaf* trigger_leaf);
-	int BuildTree();
+	virtual void RegisterRootTrigger(trigger_tree_leaf* trigger_leaf);
+	virtual void RegisterChildTrigger(trigger_tree_leaf* trigger_leaf);
+	virtual int BuildTree();
 
-	void PrintStaticTree();
-	void PrintLookupTree();
+	virtual void PrintStaticTree();
+	virtual void PrintLookupTree();
 
-	trigger_tree_leaf* ExtractCandidate();
-	trigger_tree_leaf* ExtractPostprocess();
+	virtual trigger_tree_leaf* ExtractCandidate();
+	virtual trigger_tree_leaf* ExtractPostprocess();
 
 	CTriggerTreeVector static_tree; //Неизменяемое дерево, создаваемое в процессе загрузки триггеров
 	CTriggerTreeVectorD lookup_tree; //Динамически заполняемое дерево: принимает триггеры, которые должны быть обработаны
@@ -49,11 +49,9 @@ private:
 
 	std::queue<trigger_tree_leaf*> to_process; //Триггеры, которые должны быть обработаны для построения дерева
 
-	void ProcessOneTrigger(trigger_tree_leaf* trigger_leaf);
+	virtual void ProcessOneTrigger(trigger_tree_leaf* trigger_leaf);
 	int max_distance;
 };
-
-extern CTriggerTree* trigger_tree;
 
 extern void create_trigger_tree();
 extern void build_trigger_tree();
