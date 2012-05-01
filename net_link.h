@@ -10,7 +10,13 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#ifdef MACOSX
+#include <tcl.h>
+#else
 #include <tcl8.5/tcl.h>
+#endif
+
 
 #include <vector>
 #include <map>

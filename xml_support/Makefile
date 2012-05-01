@@ -1,13 +1,22 @@
 CCP=g++
 CCC=gcc
 CFLAGS=-Wall -c -g -fPIC `pkg-config --cflags libxml-2.0`
-LDFLAGS=-shared -L ../../libxml2-2.7.8/.libs/  -lxml2
+LDFLAGS=-shared `pkg-config --libs libxml-2.0`
 
 SRCS=   xml_config.cpp
 
 OBJS:=$(SRCS:%.cpp=./obj/%.o)
 
-PROG=libxmlsup.so
+OS= $(shell uname -s)
+ifeq ("$(OS)","Linux")
+	LIB_EXT=so
+else
+	ifeq ("$(OS)","Darwin")
+	        LIB_EXT=dylib
+	endif
+endif
+
+PROG=libxmlsup.$(LIB_EXT)
 BUILD_DIR=./obj
 
 all:$(BUILD_DIR)/$(PROG)

@@ -17,6 +17,18 @@
 
 using namespace std;
 
+#ifdef MACOSX
+
+#define LIB_EXT ".dylib"
+#define LIB_EXT_LEN 6
+
+#else
+
+#define LIB_EXT ".so"
+#define LIB_EXT_LEN 3
+
+#endif
+
 std::map<std::string, trigger_init_ptr> load_trigger_handlers;
 
 int load_trigger_lib(std::string name, std::string libname) {
@@ -28,15 +40,15 @@ int load_trigger_lib(std::string name, std::string libname) {
 	}
 
 	if (0 != libname.compare(0,3,"lib")) {
-		cout << "load_trigger_lib error: library name " << libname << "couldn`t be used because prefix 'lib' is missing" << endl;
+		cout << "load_trigger_lib error: library name " << libname << " couldn`t be used because prefix 'lib' is missing" << endl;
 		return 1;
 	}
-	if (0 != libname.compare(libname.size()-3,3,".so")) {
-		cout << "load_trigger_lib error: library name " << libname << "couldn`t be used because extension '.so' is missing" << endl;
+	if (0 != libname.compare(libname.size()-LIB_EXT_LEN,LIB_EXT_LEN, LIB_EXT)) {
+		cout << "load_trigger_lib error: library name " << libname << " couldn`t be used because extension '" << LIB_EXT << "' is missing" << endl;
 		return 1;
 	}
 
-	string driver_name = libname.substr(3,libname.length()-6);
+	string driver_name = libname.substr(3,libname.length()-3-LIB_EXT_LEN);
 
 	string library_name = executable_path + libname;
 	cout << "Loading library " << library_name << endl;

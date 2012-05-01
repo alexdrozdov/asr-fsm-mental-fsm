@@ -8,7 +8,11 @@
 #ifndef MENTAL_FSM_EXT_H_
 #define MENTAL_FSM_EXT_H_
 
+#ifdef MACOSX
+#include <tcl.h>
+#else
 #include <tcl8.5/tcl.h>
+#endif
 
 #include "base_trigger.h"
 #include "mental_fsm.h"

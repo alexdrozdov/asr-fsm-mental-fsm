@@ -11,7 +11,12 @@
 #include <iostream>
 #include <string>
 
+#ifdef MACOSX
+#include <tcl.h>
+#else
 #include <tcl8.5/tcl.h>
+#endif
+
 #include "mentalstate.h"
 #include "common.h"
 
