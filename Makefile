@@ -1,9 +1,6 @@
-PROG=_mental_fsm.bin
-
-
-BUILD_DIR=./obj
 CCP=g++
 CCC=gcc
+PROTOC=protoc
 CFLAGS=-Wall -O0 -c -g3 
 
 OS=$(shell uname -s)
@@ -17,6 +14,7 @@ ifeq ($(OS),Darwin)
 else
     CFLAGS_AUX= `pkg-config --cflags libxml-2.0` \
           `pkg-config --cflags libpcre` \
+          `pkg-config --cflags protobuf` \
           -I ./xml_support/ \
           -DGNULINUX
     install_targets=install.gnulinux
@@ -27,18 +25,26 @@ LDFLAGS= -lpthread \
          -ltcl8.5 \
          `pkg-config --libs libxml-2.0` \
          `pkg-config --libs libpcre` \
+         `pkg-config --libs protobuf` \
          -lxmlsup -L ./xml_support/obj \
          -rdynamic
 
-SRCS=$(wildcard *.cpp)
+PROG=_mental_fsm.bin
+BUILD_DIR=./obj
 
+
+SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
+
+PROTO=$(wildcard *.proto)
+PROTO_CC=$(PROTO:%.proto=%.pb.cc)
+PROTO_OBJ=$(PROTO_CC:%.cc=./obj/%.o)
 
 all:$(BUILD_DIR)/$(PROG) log_v1 $(install_targets)
 
-$(BUILD_DIR)/$(PROG): dirs xmlsup $(OBJS)
+$(BUILD_DIR)/$(PROG): dirs xmlsup $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 	@echo [LD] $(PROG); \
-	$(CCP) $(OBJS) $(LDFLAGS) -o $(BUILD_DIR)/$(PROG)
+	$(CCP) $(OBJS) $(PROTO_OBJ) $(LDFLAGS) -o $(BUILD_DIR)/$(PROG)
 
 install.gnulinux: FORCE
 	@cp $(BUILD_DIR)/$(PROG) ../bin/
@@ -58,6 +64,15 @@ $(BUILD_DIR)/%.o: %.cpp
 	$(CCP) $(CFLAGS) $(CFLAGS_AUX) -MD -o $@ -c $< ;
 
 
+$(BUILD_DIR)/%.o: %.cc
+	@echo [CC] $< ; \
+	$(CCP) $(CFLAGS) $(CFLAGS_AUX) -MD -o $@ -c $< ;
+	
+%.pb.cc: %.proto
+	@echo [PROTO] $< ; \
+	$(PROTOC) -I=./ --cpp_out=./ $< ;
+
+
 include $(wildcard $(BUILD_DIR)/*.d) 
 
 log_v1 : FORCE xmlsup
@@ -67,7 +82,7 @@ xmlsup : FORCE
 	@$(MAKE) -C ./xml_support/
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) *.pb.cc *.pb.h
 	@$(MAKE) clean -C ./xml_support/
 	@$(MAKE) clean -C ./triggers/log_v1
 	

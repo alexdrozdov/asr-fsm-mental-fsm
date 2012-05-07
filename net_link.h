@@ -22,6 +22,8 @@
 #include <map>
 #include <string>
 
+#include "dsp_stream.pb.h"
+
 #include "base_trigger.h"
 #include "virt_trigger.h"
 
@@ -150,8 +152,9 @@ private:
 	int handle_network();
 	int process_buffer(unsigned char* buf, int len);
 	int process_message(unsigned char* buf, int len);
-	int process_trig_msg(unsigned char* buf, int len);
-	int process_time_msg(unsigned char* buf, int len);
+	int process_trig_msg(const ::dsp::modified_triggers& mt);
+	int process_samplerate_msg(const ::dsp::samplerate_message& srtm);
+	int process_time_msg(const ::dsp::time_message& tm);
 	int process_sec_msg(unsigned char* buf, int len);
 	int process_link_msg(unsigned char* buf, int len);
 	friend void* netlink_accept_thread (void* thread_arg);

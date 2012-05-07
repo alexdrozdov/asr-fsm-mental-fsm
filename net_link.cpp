@@ -239,14 +239,14 @@ int CNetLink::process_buffer(unsigned char* buf, int len) {
 					//Прием буфера закончился. Обрабатываем принятый буфер
 					buf_proc_state = bps_unknown;
 
-					if (len < 8) {
+					if (cur_buf_usage < 1) {
 						//Фрейм имеет правильную струткуру, но содержит менее 8 байт
-						//В нем гарантированно отсутствует тип сообщения и длина
+						//В нем гарантированно отсутствует контрольная сумма
 						//Проверить правильность данных в этом буфере невозможно
 						cout << "CNetLink::process_buffer atacked - frame is too short to be valid" << endl;
 						exit(4);
 					}
-					process_message(cur_buf,cur_buf_usage);
+					process_message(cur_buf,cur_buf_usage-2); //- CRC-16 length
 					pbuf++;
 					i++;
 					break;
@@ -297,114 +297,92 @@ int CNetLink::process_buffer(unsigned char* buf, int len) {
 }
 
 int CNetLink::process_message(unsigned char* buf, int len) {
-	int msg_type = *(int*)buf;
-	int msg_len  = *(int*)(buf+4);
-
-	//Проверяем длину сообщения
-	if (msg_len != len-2) {
-		cout << "CNetLink::process_message atacked - wrong message length specified" << endl;
-		cout << "Will now exit" << endl;
-		exit(4);
+	dsp::dsp_package pkg;
+	if (!pkg.ParseFromArray(buf, len)) {
+		cout << "CNetLink::process_message atacked - wrong message format" << endl;
+		return 1;
 	}
-	//Длина сообщения, заданная в самом сообщении совпадает с полученной длиной фрейма
-
-	//Разбираем сообщение по его типу
-	switch (msg_type) {
-		case nlmt_link:
-			return process_link_msg(buf, len);
-			break;
-		case nlmt_security:
-			return process_sec_msg(buf, len);
-			break;
-		case nlmt_time:
-			return process_time_msg(buf, len);
-			break;
-		case nlmt_trig:
-			return process_trig_msg(buf, len);
-			break;
-		case nlmt_tcl:
-			break;
-		default:
-			cout << "CNetLink::process_message atacked - unknown message type" << endl;
-			cout << "Will now exit" << endl;
-			exit(4);
+	int err = 0;
+	if (pkg.time_inst_size() > 0) {
+		err += process_time_msg(pkg.time_inst(0));
 	}
-	return 0;
+	if (pkg.samplerate_inst_size() > 0) {
+		err += process_samplerate_msg(pkg.samplerate_inst(0));
+	}
+	if (pkg.modified_triggers_inst_size() > 0) {
+		err += process_trig_msg(pkg.modified_triggers_inst(0));
+	}
+//	int msg_type = *(int*)buf;
+//	int msg_len  = *(int*)(buf+4);
+//
+//	//Проверяем длину сообщения
+//	if (msg_len != len-2) {
+//		cout << "CNetLink::process_message atacked - wrong message length specified" << endl;
+//		cout << "Will now exit" << endl;
+//		exit(4);
+//	}
+//	//Длина сообщения, заданная в самом сообщении совпадает с полученной длиной фрейма
+//
+//	//Разбираем сообщение по его типу
+//	switch (msg_type) {
+//		case nlmt_link:
+//			return process_link_msg(buf, len);
+//			break;
+//		case nlmt_security:
+//			return process_sec_msg(buf, len);
+//			break;
+//		case nlmt_time:
+//			return process_time_msg(buf, len);
+//			break;
+//		case nlmt_trig:
+//			return process_trig_msg(buf, len);
+//			break;
+//		case nlmt_tcl:
+//			break;
+//		default:
+//			cout << "CNetLink::process_message atacked - unknown message type" << endl;
+//			cout << "Will now exit" << endl;
+//			exit(4);
+//	}
+	return err;
 }
 
-int CNetLink::process_trig_msg(unsigned char* buf, int len) {
-	if (len < 12) {
-		//Фрейм имеет правильную струткуру, но содержит менее 12 байт
-		//В количество триггеров
-		//Проверить правильность данных в этом буфере невозможно
-		cout << "CNetLink::process_trig_msg atacked - frame is too short to be valid" << endl;
-		exit(4);
-	}
-	int n_triggers = *(int*)(buf+8);
-
-	//Просматриваем триггера, описываемые этим сообщением
-	unsigned char* trig_start = buf + 12;
-	int offs = 12;
-	for (int trig_cnt=0;trig_cnt<n_triggers;trig_cnt++) {
-		//cout << "len " << len << endl;
-		//cout << trig_cnt << " " << (offs+8) << endl;
-		if ((offs+8)>len) {
-			cout << "CNetLink::process_trig_msg atacked - trigger data is too short" << endl;
-			exit(4);
+int CNetLink::process_trig_msg(const ::dsp::modified_triggers& mt) {
+	::google::protobuf::RepeatedPtrField< ::dsp::modified_triger>::const_iterator ctit;
+	for (ctit=mt.items().begin();ctit!=mt.items().end();ctit++) {
+		const ::dsp::modified_triger& mmt = *ctit;
+		if (0 == mmt.outputs_size()) {
+			continue; //Триггер был передан, но не содержит ниодного изменившегося выхода
 		}
-		int trig_id = *(int*)trig_start;
-		trig_start += 4;
-		offs += 4;
-		int out_count = *(int*)trig_start;
-		trig_start += 4;
-		offs += 4;
 
+		int trig_id = mmt.id();
+		CVirtTrigger* vt = virtuals[trig_id];
 		//Проверяем, что триггер с таким id зарегистрирован
-		if (0>trig_id || (unsigned)trig_id >= virtuals.size() || NULL == virtuals[trig_id]) {
+		if (0>trig_id || (unsigned)trig_id >= virtuals.size() || NULL == vt) {
 			cout << "CNetLink::process_trig_msg atacked - trigger id is unregistered" << endl;
 			exit(4);
 		}
 
-		if (out_count <= 0) {
-			//Триггер не содержит выходов. Переходим к следующим триггерам
-			continue;
+		::google::protobuf::RepeatedPtrField< ::dsp::trigger_output>::const_iterator coit;
+		for (coit=mmt.outputs().begin();coit!=mmt.outputs().end();coit++) {
+			vt->SetOutput(coit->out_id(), coit->value());
 		}
-
-		CVirtTrigger* vt = virtuals[trig_id];
-
-		//Проверяем, что все выходы могут уместиться в остатке сообщеия
-		if ((offs+out_count*(int)sizeof(trig_msg_item)) > len) {
-			cout << "CNetLink::process_trig_msg atacked - trigger outs section is too short" << endl;
-			exit(4);
-		}
-		trig_msg_item *ptmi = (trig_msg_item*)trig_start;
-		for (int out_cnt=0;out_cnt<out_count;out_cnt++) {
-			vt->SetOutput(ptmi->out_id,ptmi->value);
-			ptmi++;
-		}
-
-		trig_start += out_count*sizeof(trig_msg_item);
-		offs += out_count*sizeof(trig_msg_item);
 	}
-
 	return 0;
 }
 
-int CNetLink::process_time_msg(unsigned char* buf, int len) {
-	int req_size = 4+4+sizeof(long long);
-	if (len < req_size) {
-		cout << "CNetLink::process_time_msg atacked - frame is too short to be valid" << endl;
-		exit(4);
-	}
-	long long *ptime = (long long*)(buf + 8);
-	long long new_time = *ptime;
+int CNetLink::process_time_msg(const ::dsp::time_message& tm) {
+	long long new_time = tm.current_time();
 	if (new_time < fsm->GetCurrentTime()) {
 		cout << "CNetLink::process_time_msg atacked - time " << new_time << " is less than current time " << fsm->GetCurrentTime() << endl;
 		exit(4);
 	}
-
 	fsm->RunToTime(fsm->ScaleRemoteTime(new_time));
-	//cout << "time is" << new_time << endl;
+	return 0;
+}
+
+int CNetLink::process_samplerate_msg(const ::dsp::samplerate_message& srtm) {
+	fsm->SetRemoteSamplerate(srtm.samplerate());
 	return 0;
 }
 

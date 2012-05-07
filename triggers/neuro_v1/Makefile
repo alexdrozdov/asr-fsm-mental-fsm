@@ -58,7 +58,7 @@ $(BUILD_DIR)/%.o: %.cpp
 
 install.gnulinux: FORCE
 	@cp $(BUILD_DIR)/$(PROG) ../../../bin/libs/
-	libfloatfann.2.dylib
+
 install.macos: FORCE
 	@install_name_tool -change ./obj/libxmlsup.dylib  @executable_path/libs/libxmlsup.dylib $(BUILD_DIR)/$(PROG)
 	@install_name_tool -change  /usr/local/lib/libfloatfann.2.dylib  @executable_path/libs/libfloatfann.2.0.1.dylib $(BUILD_DIR)/$(PROG)

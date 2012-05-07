@@ -1,0 +1,69 @@
+package sf; //signal_flow
+
+//Запись в нити о гипотезе
+message thread_quant {
+	required int32 id          = 1;
+	optional int32 probability = 2; //Достоверность этого кванта
+	optional string text       = 3; //Текстовое представление кванта (фонема, буква, слово, команда и т.п. в зависимости от слоя
+}
+
+
+enum thread_event_type {
+	thread_start    = 0; //Событие - начало нити
+	quant_start     = 1; //Событие - начало кванта
+	quant_end       = 2; //Событие - окончание кванта
+	quant_remove    = 3; //Событие - удаление кванта
+	probability_chg = 4; //Событие - изменение вероятности кванта без изменениния остального содержания
+	thread_remove   = 5; //Событие - удаление нити как неправдоподобной
+	thread_linkto   = 6; //Событие - завершение нити со слиянием с другой нитью
+	thread_linkfrom = 7; //Событие - подключение к нити со стороны другой нити
+}
+
+//Запись в нити о событии
+message thread_event {
+	required int32 id                     = 1;
+	required thread_event_type event_type = 2; //Тип события
+	required int32 time                   = 3; //Время возникновения события
+	optional int32 quant_id               = 4; //Идентификатор кванта, к которому относится событие. Возможно указание еще не существующего кванта
+	optional int32 thread_id              = 5; //Идентификатор нити, к которой относится событие. Возможно указание вновь создаваемой нити
+	optional string event_comment         = 6; //Текстовый комментарий. Например, для целей отладки
+}
+
+//Запись в нити. Событие или гипотеза
+message thread_entry {
+	required int32 id                     = 1;
+	optional thread_event event           = 2;
+	optional thread_quant quant           = 3;
+}
+
+//Поток элементарных гипотез (квантов), не противоречащих друг-другу
+message thread {
+	required int32 id             = 1;
+	required bool alive           = 2; //Признак актуальности нити
+	repeated thread_entry entries = 3; //События, происходившие и происходящие в нити
+	required int32 parent_id      = 4; //Идентификатор нити, породившей эту нить. Для первой нити в слое устанавливается в 0.
+	required int32 last_entry_id  = 5; //Номер последней записи в массиве
+	optional int32 successor_id   = 6; //Наследник нити. Устанавливается в идентификатор нити, в которую влилась эта нить. Установка поля влзможна только при сброшенном признаке alive
+}
+
+//Сообщение, пересылаемое по сети. Содержит описание записей для одной нити и одного слоя.
+message thread_entry_transaction {
+	required int32 id             = 1;
+	required int32 signal_flow_id = 2; //Идентификатор слоя, к которому относится сообщение
+	required int32 thread_id      = 3; //Идентификатор потока к которому относится сообщение
+	repeated thread_entry entries = 4; //События или гипотезы, которые должны быть переданы
+}
+
+message sf_package {
+	required int32 id = 1;
+	repeated thread_entry_transaction thread_entries = 2;
+}
+
+//Объединение потоков гипотез, противоречащих друг другу
+//Сообщение используется только для сохранения и последующей загрузки истории работы протокола. 
+message signal_flow_save {
+	required int32 id             = 1;
+	required string name          = 2;
+	required int32 last_thread_id = 3;
+	repeated thread entries       = 4;
+}
