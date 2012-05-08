@@ -7,7 +7,7 @@ ifeq ($(OS),Darwin)
           -I ./xml_support/ \
           -I ../../aux-packages/tcl8.5.9/generic/ \
           -I ../../aux-packages/build/include/ \
-          -DMACOSX
+          -DMACOSX -DAUXPACKAGES
     install_targets=install.macos
     PROTOC_PATH=$(shell pwd)/../../aux-packages/build/bin/
     
@@ -23,7 +23,7 @@ ifeq ($(AUXBUILD),AUX)
           -I ../../aux-packages/tcl8.5.9/generic/ \
           -I ../../aux-packages/build/include/ \
           -I ./xml_support/ \
-          -DMACOSX
+          -DGNULINUX -DAUXPACKAGES
     install_targets=install.gnulinux
     PROTOC_PATH=$(shell pwd)/../../aux-packages/build/bin/
     

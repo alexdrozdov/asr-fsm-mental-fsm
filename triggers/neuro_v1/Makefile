@@ -9,7 +9,7 @@ ifeq ($(OS),Darwin)
           -I ../../xml_support/ \
           -I ../../aux-packages/tcl8.5.9/generic/ \
           -I ../../../../aux-packages/build/include/ \
-          -DMACOSX
+          -DMACOSX -DAUXPACKAGES
     LIB_EXT=dylib
     
     install_targets=install.macos
@@ -26,7 +26,7 @@ ifeq ($(AUXBUILD),AUX)
           -I ../../xml_support/ \
           -I ../../../../aux-packages/tcl8.5.9/generic/ \
           -I ../../../../aux-packages/build/include/ \
-          -DMACOSX
+          -DGNULINUX -DAUXPACKAGES
 
     LDFLAGS= -shared \
          -lpthread \

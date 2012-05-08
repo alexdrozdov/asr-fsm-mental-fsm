@@ -8,7 +8,7 @@
 #ifndef MENTAL_FSM_EXT_H_
 #define MENTAL_FSM_EXT_H_
 
-#ifdef MACOSX
+#ifdef AUXPACKAGES
 #include <tcl.h>
 #else
 #include <tcl8.5/tcl.h>

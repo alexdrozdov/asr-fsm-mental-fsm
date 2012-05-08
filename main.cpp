@@ -11,7 +11,7 @@
 #include <iostream>
 #include <string>
 
-#ifdef MACOSX
+#ifdef AUXPACKAGES
 #include <tcl.h>
 #else
 #include <tcl8.5/tcl.h>
