@@ -21,14 +21,14 @@ else
 ifeq ($(AUXBUILD),AUX)
 	CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \
           -I ../../xml_support/ \
-          -I ../../aux-packages/tcl8.5.9/generic/ \
+          -I ../../../../aux-packages/tcl8.5.9/generic/ \
           -I ../../../../aux-packages/build/include/ \
           -DMACOSX
     install_targets=install.gnulinux
     
     LDFLAGS= -shared \
          -lpthread \
-         -ltcl8.5 \
+         -ltcl8.5 -L ../../../../aux-packages/build/lib/ \
          -lxmlsup -L ../../xml_support/obj/
 else
     CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \

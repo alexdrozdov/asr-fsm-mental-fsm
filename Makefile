@@ -65,7 +65,7 @@ PROTO=$(wildcard *.proto)
 PROTO_CC=$(PROTO:%.proto=%.pb.cc)
 PROTO_OBJ=$(PROTO_CC:%.cc=./obj/%.o)
 
-all:$(BUILD_DIR)/$(PROG) log_v1 $(install_targets)
+all:$(BUILD_DIR)/$(PROG) log_v1 neuro_v1 pcre_v1 $(install_targets)
 
 $(BUILD_DIR)/$(PROG): dirs xmlsup $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 	@echo [LD] $(PROG); \
@@ -102,7 +102,13 @@ $(BUILD_DIR)/%.o: %.cc
 include $(wildcard $(BUILD_DIR)/*.d) 
 
 log_v1 : FORCE xmlsup
-	@$(MAKE) -C ./triggers/log_v1/
+	@$(MAKE) -C ./triggers/log_v1/ AUXBUILD=$(AUXBUILD)
+	
+neuro_v1 : FORCE xmlsup
+	@$(MAKE) -C ./triggers/neuro_v1/ AUXBUILD=$(AUXBUILD)
+	
+pcre_v1 : FORCE xmlsup
+	@$(MAKE) -C ./triggers/pcre_v1/ AUXBUILD=$(AUXBUILD)
 	
 xmlsup : FORCE
 	@$(MAKE) -C ./xml_support/
@@ -111,6 +117,8 @@ clean:
 	rm -rf $(BUILD_DIR) *.pb.cc *.pb.h
 	@$(MAKE) clean -C ./xml_support/
 	@$(MAKE) clean -C ./triggers/log_v1
+	@$(MAKE) clean -C ./triggers/neuro_v1
+	@$(MAKE) clean -C ./triggers/pcre_v1
 	
 	
 FORCE:

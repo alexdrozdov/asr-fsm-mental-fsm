@@ -21,13 +21,24 @@ ifeq ($(OS),Darwin)
          -lfloatfann -L ../../../../aux-packages/fann-2.1.0/src/.libs/ \
          -lxmlsup -L ../../xml_support/obj/
 else
+ifeq ($(AUXBUILD),AUX)
+	CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \
+          -I ../../xml_support/ \
+          -I ../../../../aux-packages/tcl8.5.9/generic/ \
+          -I ../../../../aux-packages/build/include/ \
+          -DMACOSX
+
+    LDFLAGS= -shared \
+         -lpthread \
+         -ltcl8.5 \
+         `pkg-config --libs libxml-2.0` \
+         -lfloatfann -L ../../../../aux-packages/build/lib/ \
+         -lxmlsup -L ../../xml_support/obj/
+else
     CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \
           `pkg-config --cflags fann` \
           -I ../../xml_support/ \
           -DGNULINUX
-    LIB_EXT=so
-    
-    install_targets=install.gnulinux
     
     LDFLAGS= -shared \
          -lpthread \
@@ -35,6 +46,9 @@ else
          `pkg-config --libs libxml-2.0` \
          `pkg-config --libs fann` \
          -lxmlsup -L ../../xml_support/obj/
+endif
+	install_targets=install.gnulinux
+	LIB_EXT=so
 endif   
           
 CF_FSM_FLAGS=-I ../../
