@@ -7,24 +7,45 @@ ifeq ($(OS),Darwin)
 	CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \
           -I ../../xml_support/ \
           -I ../../aux-packages/tcl8.5.9/generic/ \
+          -I ../../../../aux-packages/build/include/ \
           -DMACOSX
     LIB_EXT=dylib
     install_targets=install.macos
+    
+    LDFLAGS= -shared \
+         -lpthread \
+         -ltcl8.5 \
+         `pkg-config --libs libxml-2.0` \
+         -lxmlsup -L ../../xml_support/obj/
+else
+ifeq ($(AUXBUILD),AUX)
+	CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \
+          -I ../../xml_support/ \
+          -I ../../aux-packages/tcl8.5.9/generic/ \
+          -I ../../../../aux-packages/build/include/ \
+          -DMACOSX
+    install_targets=install.gnulinux
+    
+    LDFLAGS= -shared \
+         -lpthread \
+         -ltcl8.5 \
+         -lxmlsup -L ../../xml_support/obj/
 else
     CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \
           -I ../../xml_support/ \
           -DGNULINUX
-    LIB_EXT=so
     install_targets=install.gnulinux
-endif
-          
-CF_FSM_FLAGS=-I ../../ 
-
-LDFLAGS= -shared \
+    
+    LDFLAGS= -shared \
          -lpthread \
          -ltcl8.5 \
          `pkg-config --libs libxml-2.0` \
-         -lxmlsup -L ../../xml_support/obj/ \
+         -lxmlsup -L ../../xml_support/obj/
+endif
+	LIB_EXT=so
+endif
+          
+CF_FSM_FLAGS=-I ../../ 
 
 SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=./obj/%.o)

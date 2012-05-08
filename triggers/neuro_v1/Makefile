@@ -8,6 +8,7 @@ ifeq ($(OS),Darwin)
           -I ../../../../aux-packages/fann-2.1.0/src/include/ \
           -I ../../xml_support/ \
           -I ../../aux-packages/tcl8.5.9/generic/ \
+          -I ../../../../aux-packages/build/include/ \
           -DMACOSX
     LIB_EXT=dylib
     

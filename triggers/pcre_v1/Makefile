@@ -8,6 +8,7 @@ ifeq ($(OS),Darwin)
           -I ../../../../aux-packages/pcre-8.12/ \
           -I ../../xml_support/ \
           -I ../../aux-packages/tcl8.5.9/generic/ \
+          -I ../../../../aux-packages/build/include/ \
           -DMACOSX
     LIB_EXT=dylib
     install_targets=install.macos
