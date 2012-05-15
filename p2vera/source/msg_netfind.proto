@@ -1,0 +1,40 @@
+package netfind;
+
+enum cookie_status {
+	none     = 0; //Cookie_id не может быть проанализирован
+	exists   = 1; //Такое cookie_id уже приходило. Вероятно, это этого же приложения, но проверить его авторство невозможно
+	actual   = 2; //Полученное значение cookie_id совпадает с уже сохраненным в приложении. Означает, что приложения уже знакомы
+	newbie   = 3; //Приложение, отправившее cookie_id, еще не было зарегистрировано в приложении получателе.
+	modified = 4; //Приложение обнаружило, что id теперь отличается
+}
+
+//Проверка доступности абонента и проверка на актуальность вязи с ним
+message msg_link_rq {
+	required string rq_cookie_id = 1;
+}
+
+message msg_link_rsp {
+	required cookie_status status = 1;
+	required string rq_cookie_id  = 2;
+	required string rp_cookie_id  = 3;
+}
+
+//Определение парамеров приложения/поиск запущенных приложений в сети
+enum app_role {
+	group_leader = 0; //Лидер группы приложений запущенных на одной машине
+	group_member = 1; //Ведомые приложения, использующие лидеров для подключения к сети
+}
+
+message msg_info_rq {
+	required string rq_cookie_id = 1;
+	optional app_role role = 2;
+}
+
+message msg_info_rsp {
+	required cookie_status status = 1;
+	required string rq_cookie_id = 2;
+	required string rp_cookie_id  = 3;
+	optional string name = 4;
+	optional string caption = 5;
+	optional app_role role = 6;
+}
