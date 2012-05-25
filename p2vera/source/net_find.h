@@ -15,16 +15,20 @@
 
 #include <pthread.h>
 
+#include <sys/time.h>
+
 #include <string>
 #include <vector>
 #include <map>
 
 #include "net_find_ifaces.h"
+#include "net_find_handlers.h"
 
 #define MAX_FAILURES_COUNT 5
 #define MAX_PING_RESP_TIMEOUT 1
 
 class NetFind;
+
 void* nf_server_rsp_thread_fcn (void* thread_arg);
 void* nf_client_thread_fcn (void* thread_arg);
 
@@ -60,6 +64,8 @@ public:
 	void enable_usage();  //Разрешает работу с этим сервером, т.е. с любым сервером,
 	                      //расположенным на этой удаленной машине
 
+	int get_uniq_id();   //Получение уникального идентификатора
+
 	friend class NetFind;
 private:
 	int failure_count;
@@ -70,6 +76,9 @@ private:
 	void add_ping_request(int ping_id);  //Регистрация отправленного запроса
 	void add_ping_response(int ping_id); //Регистрация принятого ответа
 	void validate_alive();               //Проверка на количество потеряных запросов-ответов за единицу времени
+
+	int uniq_id;
+	timeval tv_request;
 };
 
 //Класс обеспечивает поиск приложений, работающих в одной сети с ним на одном порту
@@ -86,20 +95,38 @@ public:
 	void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
 	void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
+	unsigned int get_server_port();
+	virtual unsigned int get_client_port();
+	std::string get_uniq_id();
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
 private:
 	std::vector<RemoteNfServer*> remote_servers;
+	int last_remote_id;
 	pthread_mutex_t mtx;
 
 	sockaddr_in ownaddr;
 	int sock_srv_rsp;
 
+	sockaddr_in clientaddr;
+	int sock_clt_rsp;
+
+	unsigned int server_port;
+	unsigned int client_port;
+
+	int generate_remote_id();     //Формирование уникальных идентификаторв для найденных серверов
 	int server_response_thread(); //Поток сервера. Формирует ответы на запросы клиентов
 	int server_route_thread();    //Поток сервера. Обеспечивает построение маршрутов (пока не уверен)
 	int client_thread();          //Поток клиента.
 
 	std::map<int, INetFindMsgHandler*> msg_handlers; //Обработчики сетевых сообщений, приходящих по протоколу UDP
+
+	NetFindLinkHandler *link_handler;
+	NetFindInfoHandler *info_handler;
+
+	std::string name;
+	std::string caption;
+	std::string hash;
 };
 
 

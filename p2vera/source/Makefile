@@ -12,7 +12,7 @@ ifeq ($(OS),Darwin)
     PROTOC_PATH=$(shell pwd)/../../aux-packages/build/bin/
     
     LDFLAGS=-ltcl8.5 \
-        -lpthread \
+        -lpthread -lssl -lcrypto \
         -ldl \
         -L ./xml_support/obj/ -lxmlsup  \
         -L ../../aux-packages/build/lib/ -lprotobuf \
@@ -28,7 +28,7 @@ ifeq ($(AUXBUILD),AUX)
     PROTOC_PATH=$(shell pwd)/../../aux-packages/build/bin/
     
     LDFLAGS=-ltcl8.5 \
-        -lpthread \
+        -lpthread -lssl -lcrypto \
         -ldl \
         -L ./xml_support/obj/ -lxmlsup  \
         -L ../../aux-packages/build/lib/ -lprotobuf \
@@ -38,7 +38,7 @@ else
           -DGNULINUX
     install_targets=install.gnulinux
     
-    LDFLAGS= -shared -lpthread -lprotobuf -rdynamic
+    LDFLAGS= -shared -lpthread -lprotobuf -rdynamic -lssl -lcrypto 
 endif
 	LIB_EXT=so
 endif

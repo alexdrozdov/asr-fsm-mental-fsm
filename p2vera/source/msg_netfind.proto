@@ -1,16 +1,17 @@
 package netfind;
 
 enum cookie_status {
-	none     = 0; //Cookie_id не может быть проанализирован
-	exists   = 1; //Такое cookie_id уже приходило. Вероятно, это этого же приложения, но проверить его авторство невозможно
-	actual   = 2; //Полученное значение cookie_id совпадает с уже сохраненным в приложении. Означает, что приложения уже знакомы
-	newbie   = 3; //Приложение, отправившее cookie_id, еще не было зарегистрировано в приложении получателе.
-	modified = 4; //Приложение обнаружило, что id теперь отличается
+	cookie_status_none     = 0; //Cookie_id не может быть проанализирован
+	cookie_status_exists   = 1; //Такое cookie_id уже приходило. Вероятно, это этого же приложения, но проверить его авторство невозможно
+	cookie_status_actual   = 2; //Полученное значение cookie_id совпадает с уже сохраненным в приложении. Означает, что приложения уже знакомы
+	cookie_status_newbie   = 3; //Приложение, отправившее cookie_id, еще не было зарегистрировано в приложении получателе.
+	cookie_status_modified = 4; //Приложение обнаружило, что id теперь отличается
 }
 
 //Проверка доступности абонента и проверка на актуальность вязи с ним
 message msg_link_rq {
-	required string rq_cookie_id = 1;
+	required string rq_cookie_id = 1; //
+	optional uint32  rp_port = 2;     //Порт, на который следует присылать ответ
 }
 
 message msg_link_rsp {
@@ -37,4 +38,5 @@ message msg_info_rsp {
 	optional string name = 4;
 	optional string caption = 5;
 	optional app_role role = 6;
+	optional int32 tcp_port = 7;
 }

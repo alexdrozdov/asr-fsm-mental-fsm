@@ -14,8 +14,8 @@ class NetFind;
 
 class INetFindMsgHandler {
 public:
-	virtual ~INetFindMsgHandler() = 0;
-	virtual bool HandleMessage(p2vera::msg_wrapper* wrpr) = 0;
+	//virtual ~INetFindMsgHandler() = 0;
+	virtual bool HandleMessage(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr) = 0;
 };
 
 #endif /* NET_FIND_IFACES_H_ */

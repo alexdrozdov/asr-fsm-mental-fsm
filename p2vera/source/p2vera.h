@@ -8,12 +8,20 @@
 #ifndef P2VERA_H_
 #define P2VERA_H_
 
+#include <string>
+
 #include "net_find.h"
+
+#define MD5_DIGEST_LENGTH 16
 
 class P2Vera {
 public:
 	P2Vera();
+	std::string get_uniq_id();
 private:
+	char md5_data[MD5_DIGEST_LENGTH];
+	void generate_uniq_id();
+	std::string uniq_id;
 	NetFind* nf;
 };
 
