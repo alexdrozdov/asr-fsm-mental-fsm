@@ -28,6 +28,7 @@
 #define MAX_PING_RESP_TIMEOUT 1
 
 class NetFind;
+class NetFindLinkHandler;
 
 void* nf_server_rsp_thread_fcn (void* thread_arg);
 void* nf_client_thread_fcn (void* thread_arg);
@@ -49,36 +50,29 @@ typedef struct _rmt_ping {
 	struct timeval ping_send_time;
 } rmt_ping;
 
-//Сервер, расположенный на другой машине
-class RemoteNfServer {
+class IRemoteNfServer {
 public:
-	RemoteNfServer(int id, net_find_config* rnfc);
-	bool is_alive();      //Проверить возможность установки связи с этим приложением.
-	                      //Не гарантирует жизнеспособность приложения в текущий момент,
-	                      //опирается на наличие ответов в недавнем прошлом.
-	void forbide_usage(); //Запретить проверку этого приложения на жизнеспособность,
-	                      //принудительно считать приложение отсутствующим.
-	                      //Т.к. на удаленной машине существует только один сервер с указаным
-	                      //портом, машины различаются только ip-адресами. Поэтому блокировка
-	                      //одного сервера означает полную блокировку удаленной машины
-	void enable_usage();  //Разрешает работу с этим сервером, т.е. с любым сервером,
-	                      //расположенным на этой удаленной машине
+	virtual bool is_alive() = 0;      //Проверить возможность установки связи с этим приложением.
+						  //Не гарантирует жизнеспособность приложения в текущий момент,
+						  //опирается на наличие ответов в недавнем прошлом.
+	virtual void forbide_usage() = 0; //Запретить проверку этого приложения на жизнеспособность,
+						  //принудительно считать приложение отсутствующим.
+						  //Т.к. на удаленной машине существует только один сервер с указаным
+						  //портом, машины различаются только ip-адресами. Поэтому блокировка
+						  //одного сервера означает полную блокировку удаленной машины
+	virtual void enable_usage() = 0;  //Разрешает работу с этим сервером, т.е. с любым сервером,
+						  //расположенным на этой удаленной машине
 
-	int get_uniq_id();   //Получение уникального идентификатора
+	virtual int get_id() = 0; //Получение идентификатора сервера в пределах этого приложения
+	virtual std::string get_uniq_id() = 0;   //Получение уникального идентификатора
+	virtual sockaddr_in& get_remote_sockaddr() = 0;
 
-	friend class NetFind;
-private:
-	int failure_count;
-	bool enabled;
-	pthread_mutex_t mtx;
-	std::map<int, rmt_ping> pings_sent; //Список отправленных запросов, ожидающих ответа
-
-	void add_ping_request(int ping_id);  //Регистрация отправленного запроса
-	void add_ping_response(int ping_id); //Регистрация принятого ответа
-	void validate_alive();               //Проверка на количество потеряных запросов-ответов за единицу времени
-
-	int uniq_id;
-	timeval tv_request;
+	virtual void add_ping_request(int ping_id) = 0;  //Регистрация отправленного запроса
+	virtual void add_ping_response(int ping_id) = 0; //Регистрация принятого ответа
+	virtual void validate_alive() = 0;               //Проверка на количество потеряных запросов-ответов за единицу времени
+	virtual bool ping_allowed() = 0;                 //Проверка возможности пинга. Пинг может быть запрещен, т.к. запрещено
+										 //использование этого удаленного сервера или не прошел минимальный период ожидания
+										 //с момента отправки последнего пинга.
 };
 
 //Класс обеспечивает поиск приложений, работающих в одной сети с ним на одном порту
@@ -91,7 +85,7 @@ public:
 	int add_scanable_server(std::string address, std::string port);
 	int add_unscanable_server(std::string address, std::string port);
 
-	RemoteNfServer* by_id(int id);     //Поиск сервера по его локальному id
+	IRemoteNfServer* by_id(int id);     //Поиск сервера по его локальному id
 	void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
 	void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
@@ -101,7 +95,7 @@ public:
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
 private:
-	std::vector<RemoteNfServer*> remote_servers;
+	std::vector<IRemoteNfServer*> remote_servers;
 	int last_remote_id;
 	pthread_mutex_t mtx;
 

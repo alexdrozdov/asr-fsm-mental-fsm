@@ -18,6 +18,7 @@
 #include <map>
 
 #include "net_find.h"
+#include "nf_remote_server.h"
 #include "net_find_ifaces.h"
 #include "net_find_handlers.h"
 #include "msg_wrapper.pb.h"
@@ -29,40 +30,6 @@ using namespace std;
 using namespace p2vera;
 using namespace netfind;
 
-
-RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
-}
-//Проверить возможность установки связи с этим приложением.
-//Не гарантирует жизнеспособность приложения в текущий момент,
-//опирается на наличие ответов в недавнем прошлом.
-bool RemoteNfServer::is_alive() {
-	return false;
-}
-//Запретить проверку этого приложения на жизнеспособность,
-//принудительно считать приложение отсутствующим.
-//Т.к. на удаленной машине существует только один сервер с указаным
-//портом, машины различаются только ip-адресами. Поэтому блокировка
-//одного сервера означает полную блокировку удаленной машины
-void RemoteNfServer::forbide_usage() {
-}
-//Разрешает работу с этим сервером, т.е. с любым сервером,
-//расположенным на этой удаленной машине
-void RemoteNfServer::enable_usage() {
-}
-
-int RemoteNfServer::get_uniq_id() {
-	return 0;
-}
-
-//Регистрация отправленного запроса
-void RemoteNfServer::add_ping_request(int ping_id) {
-}
-//Регистрация принятого ответа
-void RemoteNfServer::add_ping_response(int ping_id) {
-}
-//Проверка на количество потеряных запросов-ответов за единицу времени
-void RemoteNfServer::validate_alive() {
-}
 
 NetFind::NetFind(net_find_config *nfc) {
 	name = nfc->nf_name;
@@ -119,7 +86,7 @@ int NetFind::add_unscanable_server(std::string address, std::string port) {
 }
 
 //Поиск сервера по его локальному id
-RemoteNfServer* NetFind::by_id(int id) {
+IRemoteNfServer* NetFind::by_id(int id) {
 	return NULL;
 }
 //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
@@ -224,6 +191,10 @@ int NetFind::client_thread() {
 
 	while (true) {
 		link_handler->InvokeRequest();
+		vector<IRemoteNfServer*>::iterator it_rs;
+		for (it_rs=remote_servers.begin();it_rs!=remote_servers.end();it_rs++) {
+			link_handler->InvokeRequest(*it_rs);
+		}
 
 		if (poll(&pfd, 1, 100) < 1) {
 			continue;

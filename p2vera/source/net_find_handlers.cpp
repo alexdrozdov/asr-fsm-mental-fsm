@@ -35,8 +35,14 @@ NetFindLinkHandler::NetFindLinkHandler(NetFind* nf, int msg_id) {
 		cout << "NetFindLinkHandler::NetFindLinkHandler error - couldn`t open socket for sending requests" << endl;
 		perror("socket");
 	}
+
+	rq_bkst_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if (rq_bkst_socket < 0) {
+		cout << "NetFindLinkHandler::NetFindLinkHandler error - couldn`t open socket for sending broadcast requests" << endl;
+		perror("socket");
+	}
 	int broadcast = 1;
-	setsockopt(rq_socket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast));
+	setsockopt(rq_bkst_socket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast));
 	memset(&rq_bkst_addr, 0, sizeof(sockaddr_in));
 	rq_bkst_addr.sin_family = AF_INET;
 	rq_bkst_addr.sin_port = htons((unsigned short)nf->get_server_port());
@@ -150,7 +156,7 @@ bool NetFindLinkHandler::InvokeRequest() {
 		delete[] wrpr_data;
 		return false;
 	}
-	if (sendto(rq_socket, wrpr_data, wrpr.ByteSize(), 0, (sockaddr *)&rq_bkst_addr, sizeof(sockaddr_in)) < 0) {
+	if (sendto(rq_bkst_socket, wrpr_data, wrpr.ByteSize(), 0, (sockaddr *)&rq_bkst_addr, sizeof(sockaddr_in)) < 0) {
 		cout << "NetFindLinkHandler::InvokeRequest error - couldn`t send request" << endl;
 		perror("sendto");
 	}
@@ -158,7 +164,38 @@ bool NetFindLinkHandler::InvokeRequest() {
 	return true;
 }
 
-bool NetFindLinkHandler::InvokeRequest(RemoteNfServer *remote_server) {
+bool NetFindLinkHandler::InvokeRequest(IRemoteNfServer *remote_server) {
+	if (!remote_server->ping_allowed()) {
+		return true;
+	}
+	msg_link_rq mlr;
+	mlr.set_rq_cookie_id(nf->get_uniq_id());
+	mlr.set_rp_port(nf->get_client_port());
+	string mlr_str = "";
+	mlr.SerializeToString(&mlr_str);
+	msg_wrapper wrpr;
+
+	//Формируем пакет-обертку над сообщением
+	int ping_id = get_msg_id();
+	wrpr.set_msg_id(ping_id);
+	wrpr.set_msg_type(msg_wrapper_msg_type_link);
+	wrpr.set_body(mlr_str);
+	char *wrpr_data = new char[wrpr.ByteSize()];
+	if (!wrpr.SerializeToArray(wrpr_data, wrpr.ByteSize())) {
+		cout << "NetFindLinkHandler::InvokeRequest error - couldn`t serialize message wrapper" << endl;
+		delete[] wrpr_data;
+		return false;
+	}
+	if (sendto(rq_socket, wrpr_data, wrpr.ByteSize(),
+			0,
+			(sockaddr *)&(remote_server->get_remote_sockaddr()),
+			sizeof(sockaddr_in)) < 0) {
+		cout << "NetFindLinkHandler::InvokeRequest error - couldn`t send request" << endl;
+		perror("sendto");
+	} else {
+		remote_server->add_ping_request(ping_id);
+	}
+	delete[] wrpr_data;
 	return true;
 }
 
