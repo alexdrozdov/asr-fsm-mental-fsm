@@ -19,6 +19,7 @@ int main(int argc, char *argv[]) {
 	nfc.nf_hash    = p2v->get_uniq_id();
 	NetFind* nf = new NetFind(&nfc);
 	nf->add_scanable_server("127.0.0.1", "7300");
+	nf->add_broadcast_servers("7300");
 	while(true) {
 		usleep(100000);
 	}

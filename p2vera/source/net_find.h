@@ -73,6 +73,8 @@ public:
 	virtual bool ping_allowed() = 0;                 //Проверка возможности пинга. Пинг может быть запрещен, т.к. запрещено
 										 //использование этого удаленного сервера или не прошел минимальный период ожидания
 										 //с момента отправки последнего пинга.
+
+	virtual bool is_broadcast() = 0; // Сервер на самом деле не существует, а используется для хранения информации о вещательных запросах
 };
 
 //Класс обеспечивает поиск приложений, работающих в одной сети с ним на одном порту
@@ -84,8 +86,13 @@ public:
 	bool is_server(); //Позволяет проверить текущий режим этой копии библиотеки
 	int add_scanable_server(std::string address, std::string port);
 	int add_unscanable_server(std::string address, std::string port);
+	int add_broadcast_servers(std::string port); //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
 
-	IRemoteNfServer* by_id(int id);     //Поиск сервера по его локальному id
+	int add_discovered_server(sockaddr_in& addr, std::string uniq_id);
+
+	IRemoteNfServer* by_id(int id);                    //Поиск сервера по его локальному id
+	IRemoteNfServer* by_sockaddr(sockaddr_in& sa);     //Поиск сервера по его обратному адресу
+	IRemoteNfServer* by_uniq_id(std::string uniq_id); //Поиск сервера по его уникальному идентификатору
 	void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
 	void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
@@ -95,7 +102,10 @@ public:
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
 private:
-	std::vector<IRemoteNfServer*> remote_servers;
+	std::vector<IRemoteNfServer*> remote_servers;           //Массив удаленных серверов
+	std::map<unsigned long long, IRemoteNfServer*> m_sa_servers;   //Массив серверов, проиндексированный по sockaddr
+	std::map<std::string, IRemoteNfServer*> m_str_servers;  //Массив серверов, проиндексированный по уникальным идентификаторам
+
 	int last_remote_id;
 	pthread_mutex_t mtx;
 
@@ -112,6 +122,9 @@ private:
 	int server_response_thread(); //Поток сервера. Формирует ответы на запросы клиентов
 	int server_route_thread();    //Поток сервера. Обеспечивает построение маршрутов (пока не уверен)
 	int client_thread();          //Поток клиента.
+
+	bool bind_client_port();
+	bool receive_udp_message(int socket);
 
 	std::map<int, INetFindMsgHandler*> msg_handlers; //Обработчики сетевых сообщений, приходящих по протоколу UDP
 

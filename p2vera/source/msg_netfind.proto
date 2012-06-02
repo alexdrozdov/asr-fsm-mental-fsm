@@ -15,9 +15,10 @@ message msg_link_rq {
 }
 
 message msg_link_rsp {
-	required cookie_status status = 1;
-	required string rq_cookie_id  = 2;
-	required string rp_cookie_id  = 3;
+	required cookie_status status = 1; //
+	required string rq_cookie_id  = 2; //Идентификатор приложения, в ответ на запрос которого отправляется этот ответ
+	required string rp_cookie_id  = 3; //Идентификатор приложения, отправившего ответ
+	required uint32 rq_port       = 4; //Порт, на который следует посылать запросы
 }
 
 //Определение парамеров приложения/поиск запущенных приложений в сети

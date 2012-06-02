@@ -14,6 +14,7 @@
 class RemoteNfServer : public IRemoteNfServer {
 public:
 	RemoteNfServer(int id, net_find_config* rnfc);
+	RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr);
 	virtual bool is_alive();      //Проверить возможность установки связи с этим приложением.
 	                      //Не гарантирует жизнеспособность приложения в текущий момент,
 	                      //опирается на наличие ответов в недавнем прошлом.
@@ -35,6 +36,8 @@ public:
 	virtual bool ping_allowed();                 //Проверка возможности пинга. Пинг может быть запрещен, т.к. запрещено
 										 //использование этого удаленного сервера или не прошел минимальный период ожидания
 										 //с момента отправки последнего пинга.
+
+	virtual bool is_broadcast();
 
 	//friend class NetFind;
 	//friend class NetFindLinkHandler;

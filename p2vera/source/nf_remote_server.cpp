@@ -20,6 +20,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	name = rnfc->nf_name;
 	caption = rnfc->nf_caption;
 	uniq_id = rnfc->nf_hash;
+	enabled = true;
 
 	memset(&remote_addr, 0 , sizeof(sockaddr_in));
 	remote_addr.sin_family = AF_INET;
@@ -29,8 +30,22 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 		return;
 	}
 
+	gettimeofday(&tv_request, NULL);
 	min_ping_time_delta = MIN_REMOTE_PING_DELTA;
 }
+
+RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr) {
+	local_id = id;
+	name = rnfc->nf_name;
+	caption = rnfc->nf_caption;
+	uniq_id = rnfc->nf_hash;
+	enabled = true;
+	memcpy(&remote_addr, &addr, sizeof(sockaddr_in));
+
+	gettimeofday(&tv_request, NULL);
+	min_ping_time_delta = MIN_REMOTE_PING_DELTA;
+}
+
 //Проверить возможность установки связи с этим приложением.
 //Не гарантирует жизнеспособность приложения в текущий момент,
 //опирается на наличие ответов в недавнем прошлом.
@@ -50,7 +65,7 @@ void RemoteNfServer::enable_usage() {
 }
 
 int RemoteNfServer::get_id() {
-	return 0;
+	return local_id;
 }
 
 string RemoteNfServer::get_uniq_id() {
@@ -72,7 +87,9 @@ void RemoteNfServer::add_ping_response(int ping_id) {
 void RemoteNfServer::validate_alive() {
 }
 
-bool  RemoteNfServer::ping_allowed() {
+bool RemoteNfServer::ping_allowed() {
+	if (!enabled) return false;
+
 	timeval tv_now;
 	gettimeofday(&tv_now, NULL);
 	unsigned  int delta = ((1000000-tv_request.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-tv_request.tv_sec)*1000000) / 1000;
@@ -81,3 +98,8 @@ bool  RemoteNfServer::ping_allowed() {
 	}
 	return true; //Можно пиговать
 }
+//Сервер является физическим, а не виртуальным вещательным
+bool RemoteNfServer::is_broadcast() {
+	return false;
+}
+

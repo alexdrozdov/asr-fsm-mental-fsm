@@ -87,6 +87,7 @@ bool NetFindLinkHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 	mlrs.set_rq_cookie_id(mlr.rq_cookie_id());
 	mlrs.set_rp_cookie_id(nf->get_uniq_id());
 	mlrs.set_status(cookie_status_actual);
+	mlrs.set_rq_port(nf->get_client_port());
 	string mlrs_str = "";
 	mlrs.SerializeToString(&mlrs_str);
 
@@ -126,7 +127,18 @@ bool NetFindLinkHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		return false;
 	}
 
-	cout << "response from " << mlrs.rp_cookie_id() << endl;
+	IRemoteNfServer* rnfs = nf->by_uniq_id(mlrs.rp_cookie_id());
+	if (NULL == rnfs) {
+		sockaddr_in sa_rq;
+		memcpy(&sa_rq, remote_addr, sizeof(sockaddr_in));
+		sa_rq.sin_port = htons(mlrs.rq_port());
+		cout << "NetFindLinkHandler::handle_response info - discovered new server" << endl;
+		cout << "\tAddress: " << inet_ntoa(sa_rq.sin_addr) << ":" << mlrs.rq_port() << endl;
+		cout << "\tUniq id: " << mlrs.rp_cookie_id() << endl;
+		nf->add_discovered_server(sa_rq, mlrs.rp_cookie_id());
+	}
+
+	//cout << "response from " << mlrs.rp_cookie_id() << endl;
 	return true;
 }
 
@@ -168,6 +180,13 @@ bool NetFindLinkHandler::InvokeRequest(IRemoteNfServer *remote_server) {
 	if (!remote_server->ping_allowed()) {
 		return true;
 	}
+
+	int sock = 0;
+	if (remote_server->is_broadcast()) {
+		sock = rq_bkst_socket;
+	} else {
+		sock = rq_socket;
+	}
 	msg_link_rq mlr;
 	mlr.set_rq_cookie_id(nf->get_uniq_id());
 	mlr.set_rp_port(nf->get_client_port());
@@ -186,7 +205,7 @@ bool NetFindLinkHandler::InvokeRequest(IRemoteNfServer *remote_server) {
 		delete[] wrpr_data;
 		return false;
 	}
-	if (sendto(rq_socket, wrpr_data, wrpr.ByteSize(),
+	if (sendto(sock, wrpr_data, wrpr.ByteSize(),
 			0,
 			(sockaddr *)&(remote_server->get_remote_sockaddr()),
 			sizeof(sockaddr_in)) < 0) {
