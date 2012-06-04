@@ -32,6 +32,22 @@ using namespace p2vera;
 using namespace netfind;
 
 
+_rmt_ping& _rmt_ping::operator=(const _rmt_ping& rmtp) {
+	ping_id = rmtp.ping_id;
+	memcpy(&ping_send_time, &rmtp.ping_send_time, sizeof(timeval));
+	return *this;
+}
+
+_rmt_ping::_rmt_ping(const _rmt_ping& rmtp) {
+	ping_id = rmtp.ping_id;
+	memcpy(&ping_send_time, &rmtp.ping_send_time, sizeof(timeval));
+}
+
+_rmt_ping::_rmt_ping() {
+	ping_id = 0;
+	memset(&ping_send_time,0,sizeof(timeval));
+}
+
 NetFind::NetFind(net_find_config *nfc) {
 	name = nfc->nf_name;
 	caption = nfc->nf_caption;
@@ -81,6 +97,7 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc, addr);
 	remote_servers.push_back(rnfs);
 	m_str_servers[uniq_id] = rnfs;
+	reg_to_sockaddr(addr, rnfs);
 	cout << "NetFind::add_discovered_server info - server registered for " << uniq_id << endl;
 
 	return remote_id;
@@ -144,6 +161,19 @@ IRemoteNfServer* NetFind::by_uniq_id(std::string uniq_id) {
 		return NULL;
 	}
 	return it->second;
+}
+
+void NetFind::reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* irnfs) {
+	IRemoteNfServer* sa_irnfs = by_sockaddr(sa);
+	if (NULL != sa_irnfs) {
+		//Сервер с таким сочетанием ip--слушающий-порт уже был зарегистрирован ранее
+		//это означает, что он завершил свою работу. Теперь его необходимо пометить, как
+		//неактивный
+		sa_irnfs->forbide_usage();
+		cout << "NetFind::reg_to_sockaddr info - server " << sa_irnfs->get_uniq_id() << " was replaced by " << irnfs->get_uniq_id() << endl;
+	}
+	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	m_sa_servers[lsa] = irnfs;
 }
 
 //Удаление сервера из списка. Сервер может быть снова найден и получит новый id

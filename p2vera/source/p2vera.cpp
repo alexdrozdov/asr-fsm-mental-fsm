@@ -56,7 +56,7 @@ void P2Vera::generate_uniq_id() {
 	BIO_get_mem_ptr(b64, &bptr);
 	char *buff = new char[bptr->length+1];
 	memcpy(buff, bptr->data, bptr->length-1);
-	buff[bptr->length] = 0;
+	buff[bptr->length-1] = 0;
 	uniq_id = buff;
 	delete[] buff;
 	BIO_free_all(b64);

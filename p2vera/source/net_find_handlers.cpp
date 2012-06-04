@@ -19,6 +19,12 @@ using namespace std;
 using namespace p2vera;
 using namespace netfind;
 
+bool cmp_addr(sockaddr_in& sa_1, sockaddr_in& sa_2) {
+	if (sa_1.sin_port==sa_2.sin_port && sa_1.sin_addr.s_addr==sa_2.sin_addr.s_addr) {
+		return true;
+	}
+	return false;
+}
 
 NetFindLinkHandler::NetFindLinkHandler(NetFind* nf, int msg_id) {
 	if (NULL == nf) {
@@ -83,10 +89,46 @@ bool NetFindLinkHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 		return false;
 	}
 
+	cookie_status remote_status = cookie_status_none;
+
+	//Ищем пару ip-адрес--порт-ответа среди ранее зарегистрированных
+	sockaddr_in sa_rq;
+	memcpy(&sa_rq, remote_addr, sizeof(sockaddr_in));
+	sa_rq.sin_port = htons(mlr.rp_port());
+	bool is_known_addr = true;
+	IRemoteNfServer* sa_rnfs = nf->by_sockaddr(sa_rq);
+	if (NULL == sa_rnfs) {
+		is_known_addr = false;
+	}
+
+	//Проверяем статус этого сервера, ищем его идентификатор среди ранее зарегистрированных
+	bool is_known_server = true;
+	IRemoteNfServer* rnfs = nf->by_uniq_id(mlr.rq_cookie_id());
+	if (NULL == rnfs) {
+		is_known_server = false; //Такой сервер ранее не встречался
+		cout << "NetFindLinkHandler::handle_request info - discovered new server" << endl;
+		cout << "\tAddress: " << inet_ntoa(sa_rq.sin_addr) << ":" << mlr.rp_port() << endl;
+		cout << "\tUniq id: " << mlr.rq_cookie_id() << endl;
+		nf->add_discovered_server(sa_rq, mlr.rq_cookie_id());
+
+		if (is_known_addr) {
+			remote_status = cookie_status_modified; //Сервер зарегистрировался по адресу, ранее принадлежавшему другому приложению
+		} else {
+			remote_status = cookie_status_newbie;   //Новый сервер зарегистрировался по новому адресу. Он совсем новый
+		}
+	} else {
+		//Сервер с таким идентификаторм уже существует...
+		if (sa_rnfs && 0==memcmp(&rnfs->get_remote_sockaddr(), &sa_rnfs->get_remote_sockaddr(), sizeof(sockaddr_in))) {
+			remote_status = cookie_status_actual; //Параметры сервера не изменились. С сервером все в порядке
+		} else {
+			remote_status = cookie_status_exists; //Такой сервер был зарегистрирован, но по другому адресу
+		}
+	}
+
 	msg_link_rsp mlrs;
 	mlrs.set_rq_cookie_id(mlr.rq_cookie_id());
 	mlrs.set_rp_cookie_id(nf->get_uniq_id());
-	mlrs.set_status(cookie_status_actual);
+	mlrs.set_status(remote_status);
 	mlrs.set_rq_port(nf->get_client_port());
 	string mlrs_str = "";
 	mlrs.SerializeToString(&mlrs_str);
@@ -127,18 +169,29 @@ bool NetFindLinkHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		return false;
 	}
 
+	sockaddr_in sa_rq;
+	memcpy(&sa_rq, remote_addr, sizeof(sockaddr_in));
+	sa_rq.sin_port = htons(mlrs.rq_port());
+
 	IRemoteNfServer* rnfs = nf->by_uniq_id(mlrs.rp_cookie_id());
-	if (NULL == rnfs) {
-		sockaddr_in sa_rq;
-		memcpy(&sa_rq, remote_addr, sizeof(sockaddr_in));
-		sa_rq.sin_port = htons(mlrs.rq_port());
+	if (NULL == rnfs) { //Сервер с таким идентификатором не найден. Регистрируем его
 		cout << "NetFindLinkHandler::handle_response info - discovered new server" << endl;
 		cout << "\tAddress: " << inet_ntoa(sa_rq.sin_addr) << ":" << mlrs.rq_port() << endl;
 		cout << "\tUniq id: " << mlrs.rp_cookie_id() << endl;
 		nf->add_discovered_server(sa_rq, mlrs.rp_cookie_id());
+		return true;
 	}
 
-	//cout << "response from " << mlrs.rp_cookie_id() << endl;
+	//Сервер с таким идентификатором уже встречался ранее
+	if (cmp_addr(rnfs->get_remote_sockaddr(), sa_rq)) {
+		rnfs->add_ping_response(wrpr->msg_id());
+		cout << "Old value " << inet_ntoa(rnfs->get_remote_sockaddr().sin_addr) << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;
+	} else {
+		cout << "NetFindLinkHandler::handle_response warning - remote address changed for " << mlrs.rp_cookie_id() << endl;
+		//cout << "Old value " << inet_ntoa(rnfs->get_remote_sockaddr().sin_addr) << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;
+		cout << "Old value " << rnfs->get_remote_sockaddr().sin_addr.s_addr << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << sa_rq.sin_addr.s_addr <<  ":" << sa_rq.sin_port<< endl;
+	}
+
 	return true;
 }
 

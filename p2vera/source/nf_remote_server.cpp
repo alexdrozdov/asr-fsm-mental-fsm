@@ -14,6 +14,7 @@
 using namespace std;
 
 #define MIN_REMOTE_PING_DELTA 100
+#define MAX_PING_QQ_SIZE 80
 
 RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	local_id = id;
@@ -69,7 +70,7 @@ int RemoteNfServer::get_id() {
 }
 
 string RemoteNfServer::get_uniq_id() {
-	return 0;
+	return uniq_id;
 }
 
 sockaddr_in&  RemoteNfServer::get_remote_sockaddr() {
@@ -79,9 +80,28 @@ sockaddr_in&  RemoteNfServer::get_remote_sockaddr() {
 //Регистрация отправленного запроса
 void RemoteNfServer::add_ping_request(int ping_id) {
 	gettimeofday(&tv_request, NULL);
+	if (pings_sent.size() >= MAX_PING_QQ_SIZE) {
+		//Просмотреть пинги в словаре и удалить все самое старое
+	}
+
+	rmt_ping rmtp;
+	rmtp.ping_id = ping_id;
+	memcpy(&rmtp.ping_send_time, &tv_request, sizeof(timeval));
+
+	pings_sent[ping_id] = rmtp;
 }
 //Регистрация принятого ответа
 void RemoteNfServer::add_ping_response(int ping_id) {
+	timeval tv_now;
+	gettimeofday(&tv_now, NULL);
+
+	map<int, rmt_ping>::iterator it = pings_sent.find(ping_id);
+	if (it == pings_sent.end()) {
+		return; //Такой пинг не найден
+	}
+	rmt_ping& rmtp = it->second;
+	unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
+	cout << "RemoteNfServer::add_ping_response info - ping to " << uniq_id << " = " << delta << "ms" << endl;
 }
 //Проверка на количество потеряных запросов-ответов за единицу времени
 void RemoteNfServer::validate_alive() {

@@ -48,6 +48,10 @@ typedef struct _net_find_config {
 typedef struct _rmt_ping {
 	int ping_id;
 	struct timeval ping_send_time;
+
+	_rmt_ping();
+	_rmt_ping(const _rmt_ping& rmtp);
+	_rmt_ping& operator=(const _rmt_ping& rmtp);
 } rmt_ping;
 
 class IRemoteNfServer {
@@ -125,6 +129,8 @@ private:
 
 	bool bind_client_port();
 	bool receive_udp_message(int socket);
+
+	void reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* rnfs);   //Привязка сервера к его адресу
 
 	std::map<int, INetFindMsgHandler*> msg_handlers; //Обработчики сетевых сообщений, приходящих по протоколу UDP
 
