@@ -70,6 +70,8 @@ public:
 	virtual int get_id() = 0; //Получение идентификатора сервера в пределах этого приложения
 	virtual std::string get_uniq_id() = 0;   //Получение уникального идентификатора
 	virtual sockaddr_in& get_remote_sockaddr() = 0;
+	virtual void add_alternate_addr(sockaddr_in& alt_addr) = 0; //Добавить альтернативный адрес, по которому можно найти этот сервер
+	virtual bool validate_addr(sockaddr_in& alt_addr) = 0; //Проверить переданный адрес на принадлежность к этому серверу
 
 	virtual void add_ping_request(int ping_id) = 0;  //Регистрация отправленного запроса
 	virtual void add_ping_response(int ping_id) = 0; //Регистрация принятого ответа

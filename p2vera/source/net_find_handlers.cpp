@@ -7,6 +7,9 @@
 
 #include <stdio.h>
 
+#include <ifaddrs.h>
+#include <netinet/in.h>
+
 #include <iostream>
 #include <string>
 
@@ -19,9 +22,35 @@ using namespace std;
 using namespace p2vera;
 using namespace netfind;
 
-bool cmp_addr(sockaddr_in& sa_1, sockaddr_in& sa_2) {
+bool NetFindLinkHandler::cmp_addr(sockaddr_in& sa_1, sockaddr_in& sa_2) {
 	if (sa_1.sin_port==sa_2.sin_port && sa_1.sin_addr.s_addr==sa_2.sin_addr.s_addr) {
 		return true;
+	}
+	return false;
+}
+
+void NetFindLinkHandler::load_ifinfo() {
+	struct ifaddrs *ifa_ptr, *ifa_ptr_tmp;
+
+	if (getifaddrs(&ifa_ptr)!=0) {
+		perror("ERROR getifaddrs: ");
+		return;
+	}
+	for (ifa_ptr_tmp=ifa_ptr; ifa_ptr_tmp->ifa_next!=NULL; ifa_ptr_tmp=ifa_ptr_tmp->ifa_next) {
+		if (ifa_ptr_tmp->ifa_addr->sa_family!=AF_INET)
+			continue;
+		printf("Address = %s\n", inet_ntoa(((struct sockaddr_in *)(ifa_ptr_tmp->ifa_addr))->sin_addr));
+		local_ips.push_back(*((struct sockaddr_in *)(ifa_ptr_tmp->ifa_addr)));
+	}
+	freeifaddrs(ifa_ptr);
+}
+
+bool NetFindLinkHandler::is_localhost(sockaddr_in& sa) {
+	vector<sockaddr_in>::iterator it;
+	for (it=local_ips.begin();it!=local_ips.end();it++) {
+		if (it->sin_addr.s_addr==sa.sin_addr.s_addr) {
+			return true;
+		}
 	}
 	return false;
 }
@@ -32,6 +61,8 @@ NetFindLinkHandler::NetFindLinkHandler(NetFind* nf, int msg_id) {
 		return;
 	}
 	this->nf = nf;
+
+	load_ifinfo();
 
 	pthread_mutex_init (&mtx, NULL);
 	nmsg_index = 0; //Счетчик идентификаторов сообщения
@@ -109,7 +140,15 @@ bool NetFindLinkHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 		cout << "NetFindLinkHandler::handle_request info - discovered new server" << endl;
 		cout << "\tAddress: " << inet_ntoa(sa_rq.sin_addr) << ":" << mlr.rp_port() << endl;
 		cout << "\tUniq id: " << mlr.rq_cookie_id() << endl;
-		nf->add_discovered_server(sa_rq, mlr.rq_cookie_id());
+
+		int nid = nf->add_discovered_server(sa_rq, mlr.rq_cookie_id());
+		if (is_localhost(sa_rq)) {
+			IRemoteNfServer* i_rnfs = nf->by_id(nid);
+			vector<sockaddr_in>::iterator it;
+			for (it=local_ips.begin();it!=local_ips.end();it++) {
+				i_rnfs->add_alternate_addr(*it);
+			}
+		}
 
 		if (is_known_addr) {
 			remote_status = cookie_status_modified; //Сервер зарегистрировался по адресу, ранее принадлежавшему другому приложению
@@ -178,14 +217,20 @@ bool NetFindLinkHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		cout << "NetFindLinkHandler::handle_response info - discovered new server" << endl;
 		cout << "\tAddress: " << inet_ntoa(sa_rq.sin_addr) << ":" << mlrs.rq_port() << endl;
 		cout << "\tUniq id: " << mlrs.rp_cookie_id() << endl;
-		nf->add_discovered_server(sa_rq, mlrs.rp_cookie_id());
+		int nid = nf->add_discovered_server(sa_rq, mlrs.rp_cookie_id());
+		if (is_localhost(sa_rq)) {
+			IRemoteNfServer* i_rnfs = nf->by_id(nid);
+			vector<sockaddr_in>::iterator it;
+			for (it=local_ips.begin();it!=local_ips.end();it++) {
+				i_rnfs->add_alternate_addr(*it);
+			}
+		}
 		return true;
 	}
 
 	//Сервер с таким идентификатором уже встречался ранее
-	if (cmp_addr(rnfs->get_remote_sockaddr(), sa_rq)) {
+	if (rnfs->validate_addr(sa_rq)) {
 		rnfs->add_ping_response(wrpr->msg_id());
-		cout << "Old value " << inet_ntoa(rnfs->get_remote_sockaddr().sin_addr) << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;
 	} else {
 		cout << "NetFindLinkHandler::handle_response warning - remote address changed for " << mlrs.rp_cookie_id() << endl;
 		//cout << "Old value " << inet_ntoa(rnfs->get_remote_sockaddr().sin_addr) << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;

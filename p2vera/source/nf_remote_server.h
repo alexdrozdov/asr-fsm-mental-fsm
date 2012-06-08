@@ -37,6 +37,9 @@ public:
 										 //использование этого удаленного сервера или не прошел минимальный период ожидания
 										 //с момента отправки последнего пинга.
 
+	virtual void add_alternate_addr(sockaddr_in& alt_addr);
+	virtual bool validate_addr(sockaddr_in& alt_addr);
+
 	virtual bool is_broadcast();
 
 	//friend class NetFind;
@@ -54,6 +57,7 @@ private:
 	std::string caption;
 	std::string uniq_id;
 	sockaddr_in remote_addr;
+	std::vector<sockaddr_in> alternate_addrs;
 
 	timeval tv_request;
 };

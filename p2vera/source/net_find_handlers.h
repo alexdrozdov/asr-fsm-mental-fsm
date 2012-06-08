@@ -33,6 +33,13 @@ public:
 private:
 	bool handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr);
 	bool handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr);
+
+	virtual bool cmp_addr(sockaddr_in& sa_1, sockaddr_in& sa_2);
+	virtual void load_ifinfo();
+	virtual bool is_localhost(sockaddr_in& sa); //Проверят, относится ли ip адрес к этому компьютеру
+
+	std::vector<sockaddr_in> local_ips; //Массив локальных ip адресов
+
 	NetFind* nf;
 	pthread_mutex_t mtx;
 	int nmsg_index;

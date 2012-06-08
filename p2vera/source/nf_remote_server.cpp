@@ -15,6 +15,7 @@ using namespace std;
 
 #define MIN_REMOTE_PING_DELTA 100
 #define MAX_PING_QQ_SIZE 80
+#define MAX_PING_TIMEOUT 10000
 
 RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	local_id = id;
@@ -42,6 +43,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 	uniq_id = rnfc->nf_hash;
 	enabled = true;
 	memcpy(&remote_addr, &addr, sizeof(sockaddr_in));
+	alternate_addrs.push_back(addr);
 
 	gettimeofday(&tv_request, NULL);
 	min_ping_time_delta = MIN_REMOTE_PING_DELTA;
@@ -82,6 +84,16 @@ void RemoteNfServer::add_ping_request(int ping_id) {
 	gettimeofday(&tv_request, NULL);
 	if (pings_sent.size() >= MAX_PING_QQ_SIZE) {
 		//Просмотреть пинги в словаре и удалить все самое старое
+		timeval tv_now;
+		gettimeofday(&tv_now, NULL);
+		map<int, rmt_ping>::iterator it;
+		for (it=pings_sent.begin();it!=pings_sent.end();it++) {
+			rmt_ping& rmtp = it->second;
+			unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
+			if (delta>MAX_PING_TIMEOUT) {
+				pings_sent.erase(it,it);
+			}
+		}
 	}
 
 	rmt_ping rmtp;
@@ -102,9 +114,32 @@ void RemoteNfServer::add_ping_response(int ping_id) {
 	rmt_ping& rmtp = it->second;
 	unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
 	cout << "RemoteNfServer::add_ping_response info - ping to " << uniq_id << " = " << delta << "ms" << endl;
+	pings_sent.erase(it);
 }
 //Проверка на количество потеряных запросов-ответов за единицу времени
 void RemoteNfServer::validate_alive() {
+}
+
+void RemoteNfServer::add_alternate_addr(sockaddr_in& alt_addr) {
+	sockaddr_in full_alt_addr;
+	memcpy(&full_alt_addr, &alt_addr, sizeof(sockaddr_in));
+	if (0 == full_alt_addr.sin_port) {
+		full_alt_addr.sin_port = remote_addr.sin_port;
+	}
+	if (validate_addr(full_alt_addr)) {
+		return; //Такой адрес уже присутсвует в списке. Удаляем его
+	}
+	alternate_addrs.push_back(full_alt_addr);
+}
+
+bool RemoteNfServer::validate_addr(sockaddr_in& alt_addr) {
+	vector<sockaddr_in>::iterator it;
+	for (it=alternate_addrs.begin();it!=alternate_addrs.end();it++) {
+		if (it->sin_port==alt_addr.sin_port && it->sin_addr.s_addr==alt_addr.sin_addr.s_addr) {
+			return true;
+		}
+	}
+	return false;
 }
 
 bool RemoteNfServer::ping_allowed() {
