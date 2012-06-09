@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <list>
 
 #include "net_find_ifaces.h"
 #include "net_find_handlers.h"
@@ -112,6 +113,9 @@ private:
 	std::map<unsigned long long, IRemoteNfServer*> m_sa_servers;   //Массив серверов, проиндексированный по sockaddr
 	std::map<std::string, IRemoteNfServer*> m_str_servers;  //Массив серверов, проиндексированный по уникальным идентификаторам
 
+	std::list<IRemoteNfServer*> ping_list;   //Список серверов, которые должны опрошены в этой итерации
+	std::list<IRemoteNfServer*> remove_list; //Список серверов, ожидающих удаления
+
 	int last_remote_id;
 	pthread_mutex_t mtx;
 
@@ -131,6 +135,10 @@ private:
 
 	bool bind_client_port();
 	bool receive_udp_message(int socket);
+
+	void invoke_requests();
+	void review_remote_servers();
+	void unlink_server(IRemoteNfServer* irnfs); //Начать удаление сервера
 
 	void reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* rnfs);   //Привязка сервера к его адресу
 

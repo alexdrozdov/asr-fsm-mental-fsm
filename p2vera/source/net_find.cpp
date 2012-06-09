@@ -95,9 +95,13 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 
 	int remote_id = generate_remote_id();
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc, addr);
+
+	pthread_mutex_lock(&mtx);
 	remote_servers.push_back(rnfs);
 	m_str_servers[uniq_id] = rnfs;
 	reg_to_sockaddr(addr, rnfs);
+	pthread_mutex_unlock(&mtx);
+
 	cout << "NetFind::add_discovered_server info - server registered for " << uniq_id << endl;
 
 	return remote_id;
@@ -110,12 +114,15 @@ int NetFind::add_scanable_server(std::string address, std::string port) {
 	nfc.nf_port = port;
 	nfc.nf_caption = "unknown";
 	nfc.nf_name = "unknown";
+	nfc.nf_hash = "";
 	nfc.scanable = true;
 	nfc.usage = 0;
 
 	int remote_id = generate_remote_id();
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc);
+	pthread_mutex_lock(&mtx);
 	remote_servers.push_back(rnfs);
+	pthread_mutex_unlock(&mtx);
 	cout << "NetFind::add_scanable_server info - server created" << endl;
 
 	return remote_id;
@@ -130,7 +137,9 @@ int NetFind::add_broadcast_servers(std::string port) {
 	nfc.nf_port = port;
 
 	BkstNfServer* bnfs = new BkstNfServer(generate_remote_id(), &nfc);
+	pthread_mutex_lock(&mtx);
 	remote_servers.push_back(bnfs);
+	pthread_mutex_unlock(&mtx);
 	cout << "NetFind::add_broadcast_servers info - server created" << endl;
 	return 0;
 }
@@ -145,34 +154,42 @@ IRemoteNfServer* NetFind::by_id(int id) {
 
 //Поиск сервера по его обратному адресу
 IRemoteNfServer* NetFind::by_sockaddr(sockaddr_in& sa) {
+	pthread_mutex_lock(&mtx);
 	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
 	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
 	if (it == m_sa_servers.end()) {
+		pthread_mutex_unlock(&mtx);
 		return NULL;
 	}
 
+	pthread_mutex_unlock(&mtx);
 	return it->second;
 }
 
 //Поиск сервера по его уникальному идентификатору
 IRemoteNfServer* NetFind::by_uniq_id(std::string uniq_id) {
+	pthread_mutex_lock(&mtx);
 	map<std::string, IRemoteNfServer*>::iterator it = m_str_servers.find(uniq_id);
 	if (it == m_str_servers.end()) {
+		pthread_mutex_unlock(&mtx);
 		return NULL;
 	}
+	pthread_mutex_unlock(&mtx);
 	return it->second;
 }
 
 void NetFind::reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* irnfs) {
-	IRemoteNfServer* sa_irnfs = by_sockaddr(sa);
-	if (NULL != sa_irnfs) {
+	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
+	if (it!=m_sa_servers.end()) {
 		//Сервер с таким сочетанием ip--слушающий-порт уже был зарегистрирован ранее
 		//это означает, что он завершил свою работу. Теперь его необходимо пометить, как
 		//неактивный
+		IRemoteNfServer* sa_irnfs = it->second;
 		sa_irnfs->forbide_usage();
 		cout << "NetFind::reg_to_sockaddr info - server " << sa_irnfs->get_uniq_id() << " was replaced by " << irnfs->get_uniq_id() << endl;
 	}
-	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
 	m_sa_servers[lsa] = irnfs;
 }
 
@@ -275,6 +292,59 @@ bool NetFind::receive_udp_message(int socket) {
 	return true;
 }
 
+//Просмотр списка серверов, удаление серверов, прекративших свое существование
+//заполнение списка серверов, которые необходимо опросить
+void NetFind::review_remote_servers() {
+	ping_list.clear();
+
+	vector<IRemoteNfServer*>::iterator it_rs;
+	pthread_mutex_lock(&mtx);
+	for (it_rs=remote_servers.begin();it_rs!=remote_servers.end();it_rs++) {
+		IRemoteNfServer* irnfs = *it_rs;
+		if (NULL == irnfs) continue; //Этот сервер уже был удален
+		irnfs->validate_alive(); //Проверяем, что сервер пингуется
+		if (!irnfs->is_alive() && !irnfs->is_broadcast()) { //FIXME Подготовить запись о сервере к удалению
+			unlink_server(irnfs);
+			continue;
+		}
+		if (irnfs->ping_allowed()) {
+			ping_list.push_back(irnfs);
+		}
+	}
+	pthread_mutex_unlock(&mtx);
+}
+
+void NetFind::invoke_requests() {
+	list<IRemoteNfServer*>::iterator it_rs;
+	for (it_rs=ping_list.begin();it_rs!=ping_list.end();it_rs++) {
+		link_handler->InvokeRequest(*it_rs);
+	}
+}
+
+//Подготовить сервер к удалению. Сервер должен быть перемещен в список
+//ожидающих удаления и удален из всех остальных списоков
+void NetFind::unlink_server(IRemoteNfServer* irnfs) {
+	if (NULL == irnfs) return;
+	remove_list.push_back(irnfs);
+
+	int nid = irnfs->get_id();
+	sockaddr_in& sa = irnfs->get_remote_sockaddr();
+
+	string uniq_id = irnfs->get_uniq_id();
+	map<std::string, IRemoteNfServer*>::iterator it_id = m_str_servers.find(uniq_id);
+	if (it_id != m_str_servers.end()) {
+		m_str_servers.erase(it_id);
+	}
+
+	remote_servers[nid] = NULL;
+
+	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	map<unsigned long long, IRemoteNfServer*>::iterator it_sa = m_sa_servers.find(lsa);
+	if (it_sa!=m_sa_servers.end()) {
+		m_sa_servers.erase(it_sa);
+	}
+}
+
 //Поток клиента.
 int NetFind::client_thread() {
 	while (true) {
@@ -288,10 +358,8 @@ int NetFind::client_thread() {
 		pfd.revents = 0;
 
 		while (true) {
-			vector<IRemoteNfServer*>::iterator it_rs;
-			for (it_rs=remote_servers.begin();it_rs!=remote_servers.end();it_rs++) {
-				link_handler->InvokeRequest(*it_rs);
-			}
+			review_remote_servers();
+			invoke_requests();
 
 			if (poll(&pfd, 1, 100) < 1) {
 				continue;

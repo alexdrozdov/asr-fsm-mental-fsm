@@ -233,8 +233,7 @@ bool NetFindLinkHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		rnfs->add_ping_response(wrpr->msg_id());
 	} else {
 		cout << "NetFindLinkHandler::handle_response warning - remote address changed for " << mlrs.rp_cookie_id() << endl;
-		//cout << "Old value " << inet_ntoa(rnfs->get_remote_sockaddr().sin_addr) << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;
-		cout << "Old value " << rnfs->get_remote_sockaddr().sin_addr.s_addr << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << sa_rq.sin_addr.s_addr <<  ":" << sa_rq.sin_port<< endl;
+		cout << "Old value " << inet_ntoa(rnfs->get_remote_sockaddr().sin_addr) << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;
 	}
 
 	return true;
@@ -275,9 +274,7 @@ bool NetFindLinkHandler::InvokeRequest() {
 }
 
 bool NetFindLinkHandler::InvokeRequest(IRemoteNfServer *remote_server) {
-	if (!remote_server->ping_allowed()) {
-		return true;
-	}
+	if (NULL == remote_server) return false;
 
 	int sock = 0;
 	if (remote_server->is_broadcast()) {

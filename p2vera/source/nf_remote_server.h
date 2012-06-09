@@ -47,6 +47,8 @@ public:
 private:
 	int failure_count;
 	bool enabled;
+	bool is_addr_placeholder; //Сервер хранит адрес, по которому можно найти реально работающее приложение.
+	                          //Добавлен порльзователем, поэтому не имеет уникального идентификатора
 	pthread_mutex_t mtx;
 	std::map<int, rmt_ping> pings_sent; //Список отправленных запросов, ожидающих ответа
 

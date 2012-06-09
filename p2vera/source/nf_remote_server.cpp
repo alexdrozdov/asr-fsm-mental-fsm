@@ -15,14 +15,21 @@ using namespace std;
 
 #define MIN_REMOTE_PING_DELTA 100
 #define MAX_PING_QQ_SIZE 80
-#define MAX_PING_TIMEOUT 10000
+#define MAX_PING_TIMEOUT 2000
+#define MAX_FAILURE_COUNT 10
 
 RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	local_id = id;
 	name = rnfc->nf_name;
 	caption = rnfc->nf_caption;
 	uniq_id = rnfc->nf_hash;
+	if (rnfc->nf_hash.length()<1) {
+		is_addr_placeholder = true;
+	} else {
+		is_addr_placeholder = false;
+	}
 	enabled = true;
+	failure_count = 0;
 
 	memset(&remote_addr, 0 , sizeof(sockaddr_in));
 	remote_addr.sin_family = AF_INET;
@@ -42,6 +49,9 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 	caption = rnfc->nf_caption;
 	uniq_id = rnfc->nf_hash;
 	enabled = true;
+	failure_count = 0;
+	is_addr_placeholder = false;
+
 	memcpy(&remote_addr, &addr, sizeof(sockaddr_in));
 	alternate_addrs.push_back(addr);
 
@@ -53,6 +63,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 //Не гарантирует жизнеспособность приложения в текущий момент,
 //опирается на наличие ответов в недавнем прошлом.
 bool RemoteNfServer::is_alive() {
+	if (failure_count <= MAX_FAILURE_COUNT) return true;
 	return false;
 }
 //Запретить проверку этого приложения на жизнеспособность,
@@ -92,6 +103,7 @@ void RemoteNfServer::add_ping_request(int ping_id) {
 			unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
 			if (delta>MAX_PING_TIMEOUT) {
 				pings_sent.erase(it,it);
+				failure_count++;
 			}
 		}
 	}
@@ -104,20 +116,37 @@ void RemoteNfServer::add_ping_request(int ping_id) {
 }
 //Регистрация принятого ответа
 void RemoteNfServer::add_ping_response(int ping_id) {
-	timeval tv_now;
-	gettimeofday(&tv_now, NULL);
+	//timeval tv_now;
+	//gettimeofday(&tv_now, NULL);
 
 	map<int, rmt_ping>::iterator it = pings_sent.find(ping_id);
 	if (it == pings_sent.end()) {
 		return; //Такой пинг не найден
 	}
-	rmt_ping& rmtp = it->second;
-	unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
-	cout << "RemoteNfServer::add_ping_response info - ping to " << uniq_id << " = " << delta << "ms" << endl;
+	//rmt_ping& rmtp = it->second;
+	//unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
+	//cout << "RemoteNfServer::add_ping_response info - ping to " << uniq_id << " = " << delta << "ms" << endl;
 	pings_sent.erase(it);
+	failure_count = 0;
 }
 //Проверка на количество потеряных запросов-ответов за единицу времени
 void RemoteNfServer::validate_alive() {
+	if (is_addr_placeholder) return; //Эта запись только хранит адрес и не может быть проверена
+
+	timeval tv_now;
+	gettimeofday(&tv_now, NULL);
+	map<int, rmt_ping>::iterator it;
+	for (it=pings_sent.begin();it!=pings_sent.end();it++) {
+		rmt_ping& rmtp = it->second;
+		unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
+		if (delta>MAX_PING_TIMEOUT) {
+			pings_sent.erase(it,it);
+			failure_count++;
+		}
+	}
+
+	if (failure_count > MAX_FAILURE_COUNT)
+		cout << "RemoteNfServer::validate_alive info - server " << uniq_id << " is dead" << endl;
 }
 
 void RemoteNfServer::add_alternate_addr(sockaddr_in& alt_addr) {
