@@ -90,3 +90,9 @@ bool BkstNfServer::is_broadcast() {
 	return true;
 }
 
+void BkstNfServer::print_info() {
+	cout << "server type: broadcast" << endl;
+	cout << "address: " << inet_ntoa(remote_addr.sin_addr) << ":" << htons(remote_addr.sin_port) << endl;
+}
+
+

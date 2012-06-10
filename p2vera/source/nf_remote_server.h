@@ -44,6 +44,7 @@ public:
 	virtual bool requires_info_request();
 
 	virtual bool is_broadcast();
+	virtual void print_info();
 
 	//friend class NetFind;
 	//friend class NetFindLinkHandler;

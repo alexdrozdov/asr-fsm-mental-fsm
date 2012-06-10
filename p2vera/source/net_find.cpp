@@ -55,6 +55,7 @@ NetFind::NetFind(net_find_config *nfc) {
 	name = nfc->nf_name;
 	caption = nfc->nf_caption;
 	hash = nfc->nf_hash;
+	cluster = nfc->nf_cluster;
 
 	last_remote_id = 0; //Идентификатор последнего найденного сервера
 
@@ -199,8 +200,20 @@ void NetFind::reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* irnfs) {
 //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
 void NetFind::remove_remote_server(int id) {
 }
-//Вывод в консоль списка известрных серверов с их статусами
+//Вывод в консоль списка известных серверов с их статусами
 void NetFind::print_servers() {
+	pthread_mutex_lock(&mtx);
+	vector<IRemoteNfServer*>::iterator it;
+	int count = 0;
+	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
+		IRemoteNfServer* irnfs = *it;
+		if (NULL == irnfs) continue;
+		irnfs->print_info();
+		cout << endl;
+		count++;
+	}
+	cout << "total: " << count << endl;
+	pthread_mutex_unlock(&mtx);
 }
 
 unsigned int NetFind::get_server_port() {

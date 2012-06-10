@@ -223,3 +223,16 @@ bool RemoteNfServer::is_broadcast() {
 	return false;
 }
 
+void RemoteNfServer::print_info() {
+	cout << "server type: " << (is_addr_placeholder?(string)"virtual":(string)"physical") << endl;
+	cout << "uniq id: " << uniq_id << endl;
+	cout << "address: " << inet_ntoa(remote_addr.sin_addr) << ":" << htons(remote_addr.sin_port) << endl;
+	if (full_info_present) {
+		cout << "name:    " << name << endl;
+		cout << "caption: " << caption << endl;
+		cout << "cluster: " << cluster << endl;
+	} else {
+		cout << "warning: aux info unavaible" << endl;
+	}
+}
+
