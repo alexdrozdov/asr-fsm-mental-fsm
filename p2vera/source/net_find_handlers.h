@@ -59,8 +59,17 @@ public:
 	NetFindInfoHandler(NetFind* nf, int msg_id);
 	virtual ~NetFindInfoHandler();
 	virtual bool HandleMessage(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr);
+	virtual bool InvokeRequest(IRemoteNfServer *remote_server); //Отправка запроса на выбранный сервер
+	virtual int get_msg_id();
 private:
+	bool handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr);
+	bool handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr);
+
 	NetFind* nf;
+	pthread_mutex_t mtx;
+	int nmsg_index;
+
+	int rq_socket;
 };
 
 #endif /* NET_FIND_HANDLERS_H_ */

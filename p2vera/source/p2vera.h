@@ -10,7 +10,7 @@
 
 #include <string>
 
-#include "net_find.h"
+#include "inet_find.h"
 
 #define MD5_DIGEST_LENGTH 16
 
@@ -22,7 +22,7 @@ private:
 	char md5_data[MD5_DIGEST_LENGTH];
 	void generate_uniq_id();
 	std::string uniq_id;
-	NetFind* nf;
+	INetFind* nf;
 };
 
 #endif /* P2VERA_H_ */

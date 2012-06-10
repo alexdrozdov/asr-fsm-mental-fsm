@@ -81,6 +81,10 @@ bool  BkstNfServer::ping_allowed() {
 	return true; //Можно пиговать
 }
 
+bool BkstNfServer::requires_info_request() {
+	return false;
+}
+
 //Сервер не существует в реальности а представляет все сервера, которые можно обнаружить вещательным запросом
 bool BkstNfServer::is_broadcast() {
 	return true;

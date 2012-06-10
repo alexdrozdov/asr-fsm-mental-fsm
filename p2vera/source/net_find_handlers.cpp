@@ -17,6 +17,7 @@
 #include "msg_wrapper.pb.h"
 #include "msg_netfind.pb.h"
 #include "net_find_handlers.h"
+#include "nf_remote_server.h"
 
 using namespace std;
 using namespace p2vera;
@@ -39,7 +40,6 @@ void NetFindLinkHandler::load_ifinfo() {
 	for (ifa_ptr_tmp=ifa_ptr; ifa_ptr_tmp->ifa_next!=NULL; ifa_ptr_tmp=ifa_ptr_tmp->ifa_next) {
 		if (ifa_ptr_tmp->ifa_addr->sa_family!=AF_INET)
 			continue;
-		printf("Address = %s\n", inet_ntoa(((struct sockaddr_in *)(ifa_ptr_tmp->ifa_addr))->sin_addr));
 		local_ips.push_back(*((struct sockaddr_in *)(ifa_ptr_tmp->ifa_addr)));
 	}
 	freeifaddrs(ifa_ptr);
@@ -89,6 +89,8 @@ NetFindLinkHandler::NetFindLinkHandler(NetFind* nf, int msg_id) {
 }
 
 NetFindLinkHandler::~NetFindLinkHandler() {
+	close(rq_socket);
+	close(rq_bkst_socket);
 }
 
 int NetFindLinkHandler::get_msg_id() {
@@ -315,13 +317,152 @@ bool NetFindLinkHandler::InvokeRequest(IRemoteNfServer *remote_server) {
 
 
 NetFindInfoHandler::NetFindInfoHandler(NetFind* nf, int msg_id) {
+	if (NULL == nf) {
+		cout << "NetFindInfoHandler::NetFindInfoHandler error - NULL pointer to NetFind" << endl;
+		return;
+	}
+	this->nf = nf;
+
+	pthread_mutex_init (&mtx, NULL);
+	nmsg_index = 0; //Счетчик идентификаторов сообщения
+
+	rq_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if (rq_socket < 0) {
+		cout << "NetFindInfoHandler::NetFindInfoHandler error - couldn`t open socket for sending requests" << endl;
+		perror("socket");
+	}
 }
 
 NetFindInfoHandler::~NetFindInfoHandler() {
+	close(rq_socket);
+}
+
+int NetFindInfoHandler::get_msg_id() {
+	pthread_mutex_lock(&mtx);
+	int n = nmsg_index++;
+	pthread_mutex_unlock(&mtx);
+	return n;
 }
 
 bool NetFindInfoHandler::HandleMessage(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr) {
-	return false;
+	switch (wrpr->dir()) {
+		case msg_wrapper_msg_direction_request:
+			handle_request(wrpr,remote_addr);
+			break;
+		case msg_wrapper_msg_direction_response:
+			handle_response(wrpr,remote_addr);
+			break;
+		default:
+			cout << "NetFind::server_response_thread warning - unknown message direction" << endl;
+			break;
+	}
+	return true;
+}
+
+bool NetFindInfoHandler::InvokeRequest(IRemoteNfServer *remote_server) {
+	if (NULL==remote_server || remote_server->is_broadcast()) return false;
+
+	msg_info_rq mir;
+	mir.set_rq_cookie_id(nf->get_uniq_id());
+	mir.set_rp_port(nf->get_client_port());
+	string mir_str = "";
+	mir.SerializeToString(&mir_str);
+	msg_wrapper wrpr;
+
+	//Формируем пакет-обертку над сообщением
+	int rq_id = get_msg_id();
+	wrpr.set_msg_id(rq_id);
+	wrpr.set_msg_type(msg_wrapper_msg_type_info);
+	wrpr.set_body(mir_str);
+	char *wrpr_data = new char[wrpr.ByteSize()];
+	if (!wrpr.SerializeToArray(wrpr_data, wrpr.ByteSize())) {
+		cout << "NetFindInfoHandler::InvokeRequest error - couldn`t serialize message wrapper" << endl;
+		delete[] wrpr_data;
+		return false;
+	}
+	if (sendto(rq_socket, wrpr_data, wrpr.ByteSize(),
+			0,
+			(sockaddr *)&(remote_server->get_remote_sockaddr()),
+			sizeof(sockaddr_in)) < 0) {
+		cout << "NetFindInfoHandler::InvokeRequest error - couldn`t send request" << endl;
+		perror("sendto");
+	}
+	delete[] wrpr_data;
+	return true;
+}
+
+bool NetFindInfoHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr) {
+	msg_info_rq mir;
+	if (!mir.ParseFromString(wrpr->body())) {
+		cout << "NetFindInfoHandler::handle_request error - failed to parse message" << endl;
+		return false;
+	}
+
+	msg_info_rsp mirs;
+	mirs.set_rq_cookie_id(mir.rq_cookie_id());
+	mirs.set_rp_cookie_id(nf->get_uniq_id());
+	mirs.set_caption(nf->get_caption());
+	mirs.set_name(nf->get_name());
+	mirs.set_cluster(nf->get_cluster());
+
+	string mirs_str = "";
+	mirs.SerializeToString(&mirs_str);
+
+	msg_wrapper nwrpr;
+	nwrpr.set_msg_id(wrpr->msg_id());
+	nwrpr.set_msg_type(msg_wrapper_msg_type_info);
+	nwrpr.set_dir(msg_wrapper_msg_direction_response);
+	nwrpr.set_body(mirs_str);
+	char *nwrpr_data = new char[nwrpr.ByteSize()];
+	if (!nwrpr.SerializeToArray(nwrpr_data, nwrpr.ByteSize())) {
+		cout << "NetFindInfoHandler::handle_request error - couldn`t serialize message wrapper" << endl;
+		delete[] nwrpr_data;
+		return false;
+	}
+	sockaddr_in response_addr;
+	memset(&response_addr, 0, sizeof(sockaddr_in));
+	response_addr.sin_family = AF_INET;
+	response_addr.sin_addr.s_addr = remote_addr->sin_addr.s_addr;
+	response_addr.sin_port = htons(mir.rp_port());
+	if (sendto(rq_socket, nwrpr_data, nwrpr.ByteSize(), 0, (sockaddr*)&response_addr, sizeof(sockaddr_in)) < 0) {
+		cout << "NetFindInfoHandler::handle_request error - couldn`t send response" << endl;
+		perror("sendto");
+	}
+	delete[] nwrpr_data;
+	return true;
+}
+
+bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr) {
+	msg_info_rsp mirs;
+	if (!mirs.ParseFromString(wrpr->body())) {
+		cout << "NetFindInfoHandler::handle_response error - failed to parse message" << endl;
+		return false;
+	}
+
+	RemoteNfServer* rnfs = reinterpret_cast<RemoteNfServer*>(nf->by_uniq_id(mirs.rp_cookie_id()));
+	if (NULL == rnfs) { //Сервер с таким идентификатором не найден.
+		return false;
+	}
+
+	net_find_config nfc;
+	if (mirs.has_caption()) {
+		nfc.nf_caption = mirs.caption();
+	} else {
+		nfc.nf_caption = "";
+	}
+	if (mirs.has_name()) {
+		nfc.nf_name = mirs.name();
+	} else {
+		nfc.nf_name = "";
+	}
+	if (mirs.has_cluster()) {
+		nfc.nf_cluster = mirs.cluster();
+	} else {
+		nfc.nf_name = "";
+	}
+	rnfs->update_info(&nfc);
+
+	return true;
 }
 
 

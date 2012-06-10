@@ -27,6 +27,7 @@ public:
 	virtual bool ping_allowed();
 	virtual void add_alternate_addr(sockaddr_in& alt_addr);
 	virtual bool validate_addr(sockaddr_in& alt_addr);
+	virtual bool requires_info_request();
 	virtual bool is_broadcast();
 private:
 	bool enabled;

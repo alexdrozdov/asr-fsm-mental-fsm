@@ -5,6 +5,8 @@
  *      Author: drozdov
  */
 
+#include <string.h>
+
 #include <unistd.h>
 #include <sys/time.h>
 #include <openssl/md5.h>

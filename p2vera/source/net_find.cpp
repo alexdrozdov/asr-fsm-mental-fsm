@@ -25,6 +25,9 @@
 #include "msg_wrapper.pb.h"
 #include "msg_netfind.pb.h"
 
+#include "mtx_containers.h"
+#include "mtx_containers.hpp"
+
 #define MAX_RSP_RCV_BUFLEN 1024
 
 using namespace std;
@@ -66,7 +69,9 @@ NetFind::NetFind(net_find_config *nfc) {
 
 	//Создаем обработчики сообщений
 	link_handler = new NetFindLinkHandler(this, 0);
+	info_handler = new NetFindInfoHandler(this, 1);
 	msg_handlers[0] = link_handler;
+	msg_handlers[1] = info_handler;
 
 	//Создаем потоки
 	pthread_t thread_id;
@@ -102,6 +107,10 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 	reg_to_sockaddr(addr, rnfs);
 	pthread_mutex_unlock(&mtx);
 
+	if (rnfs->requires_info_request()) {
+		info_list.push_back(rnfs);
+	}
+
 	cout << "NetFind::add_discovered_server info - server registered for " << uniq_id << endl;
 
 	return remote_id;
@@ -123,13 +132,8 @@ int NetFind::add_scanable_server(std::string address, std::string port) {
 	pthread_mutex_lock(&mtx);
 	remote_servers.push_back(rnfs);
 	pthread_mutex_unlock(&mtx);
-	cout << "NetFind::add_scanable_server info - server created" << endl;
 
 	return remote_id;
-}
-
-int NetFind::add_unscanable_server(std::string address, std::string port) {
-	return 0;
 }
 
 int NetFind::add_broadcast_servers(std::string port) {
@@ -140,7 +144,6 @@ int NetFind::add_broadcast_servers(std::string port) {
 	pthread_mutex_lock(&mtx);
 	remote_servers.push_back(bnfs);
 	pthread_mutex_unlock(&mtx);
-	cout << "NetFind::add_broadcast_servers info - server created" << endl;
 	return 0;
 }
 
@@ -210,6 +213,18 @@ unsigned int NetFind::get_client_port() {
 
 std::string NetFind::get_uniq_id() {
 	return hash;
+}
+
+std::string NetFind::get_name() {
+	return name;
+}
+
+std::string NetFind::get_caption() {
+	return caption;
+}
+
+std::string NetFind::get_cluster() {
+	return cluster;
 }
 
 //Поток сервера. Формирует ответы на запросы клиентов
@@ -303,8 +318,8 @@ void NetFind::review_remote_servers() {
 		IRemoteNfServer* irnfs = *it_rs;
 		if (NULL == irnfs) continue; //Этот сервер уже был удален
 		irnfs->validate_alive(); //Проверяем, что сервер пингуется
-		if (!irnfs->is_alive() && !irnfs->is_broadcast()) { //FIXME Подготовить запись о сервере к удалению
-			unlink_server(irnfs);
+		if (!irnfs->is_alive() && !irnfs->is_broadcast()) {
+			unlink_server(irnfs); //Сервер недоступен. Подготовить его к удалению
 			continue;
 		}
 		if (irnfs->ping_allowed()) {
@@ -316,8 +331,13 @@ void NetFind::review_remote_servers() {
 
 void NetFind::invoke_requests() {
 	list<IRemoteNfServer*>::iterator it_rs;
+	//Пингуем сервера, для которых подошло время
 	for (it_rs=ping_list.begin();it_rs!=ping_list.end();it_rs++) {
 		link_handler->InvokeRequest(*it_rs);
+	}
+	//Собираем информацию с вновь обнаруженных серверов
+	while (info_list.size()) {
+		info_handler->InvokeRequest(info_list.pop_front());
 	}
 }
 
@@ -328,7 +348,6 @@ void NetFind::unlink_server(IRemoteNfServer* irnfs) {
 	remove_list.push_back(irnfs);
 
 	int nid = irnfs->get_id();
-	sockaddr_in& sa = irnfs->get_remote_sockaddr();
 
 	string uniq_id = irnfs->get_uniq_id();
 	map<std::string, IRemoteNfServer*>::iterator it_id = m_str_servers.find(uniq_id);
@@ -338,11 +357,13 @@ void NetFind::unlink_server(IRemoteNfServer* irnfs) {
 
 	remote_servers[nid] = NULL;
 
-	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
-	map<unsigned long long, IRemoteNfServer*>::iterator it_sa = m_sa_servers.find(lsa);
-	if (it_sa!=m_sa_servers.end()) {
-		m_sa_servers.erase(it_sa);
-	}
+	//FIXED Удалять запись из списка адресов нельзя, т.к. она уже может быть занята другим приложением,
+	//запустившимся на той же машине и занявшим тот же порт.
+	//unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	//map<unsigned long long, IRemoteNfServer*>::iterator it_sa = m_sa_servers.find(lsa);
+	//if (it_sa!=m_sa_servers.end()) {
+	//	m_sa_servers.erase(it_sa);
+	//}
 }
 
 //Поток клиента.
@@ -384,6 +405,15 @@ void* nf_client_thread_fcn (void* thread_arg) {
 	NetFind* nf = (NetFind*)thread_arg;
 	nf->client_thread();
 	return NULL;
+}
+
+INetFind* net_find_create(net_find_config *nfc) {
+	if (NULL == nfc) {
+		cout << "net_find_create error - NULL pointer to net_find_config" << endl;
+		return NULL;
+	}
+
+	return new NetFind(nfc);
 }
 
 

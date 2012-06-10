@@ -29,15 +29,32 @@ enum app_role {
 
 message msg_info_rq {
 	required string rq_cookie_id = 1;
-	optional app_role role = 2;
+	optional uint32 rp_port      = 2;   //Порт, на который следует присылать ответ
+}
+
+message p2v_channel {
+	required string name           = 1; //Название канала. Соединение выполняется по названию
+	enum channel_mode {
+		p2p = 0;
+		p2m = 1;
+		m2p = 2;
+		m2m = 3;
+	}
+	required channel_mode ch_mode  = 2; //Способ распространения сообщенийв канале
+	enum endpoint_mode {
+		receiver    = 0;
+		transmitter = 1;
+		tranceiver  = 2;
+	}
+	required endpoint_mode ep_mode = 3; //Тип конечной точки
+	optional string caption        = 4;
 }
 
 message msg_info_rsp {
-	required cookie_status status = 1;
-	required string rq_cookie_id = 2;
-	required string rp_cookie_id  = 3;
-	optional string name = 4;
-	optional string caption = 5;
-	optional app_role role = 6;
-	optional int32 tcp_port = 7;
+	required string rq_cookie_id  = 1;
+	required string rp_cookie_id  = 2;
+	optional string cluster       = 3; //Название кластера, к которому относится этот сервер
+	optional string name          = 4; //Название приложения
+	optional string caption       = 5; //Расшифровка названия в человеко читаемом виде
+	repeated p2v_channel channels = 6; //Список каналов, в которых может работать этот сервер
 }

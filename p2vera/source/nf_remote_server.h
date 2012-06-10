@@ -39,6 +39,9 @@ public:
 
 	virtual void add_alternate_addr(sockaddr_in& alt_addr);
 	virtual bool validate_addr(sockaddr_in& alt_addr);
+	virtual bool update_info(net_find_config* rnfc);
+
+	virtual bool requires_info_request();
 
 	virtual bool is_broadcast();
 
@@ -49,6 +52,7 @@ private:
 	bool enabled;
 	bool is_addr_placeholder; //Сервер хранит адрес, по которому можно найти реально работающее приложение.
 	                          //Добавлен порльзователем, поэтому не имеет уникального идентификатора
+	bool full_info_present;   //Вся информация о сервере получена и хранится в этом объекте. В противном случае ее необходимо получить
 	pthread_mutex_t mtx;
 	std::map<int, rmt_ping> pings_sent; //Список отправленных запросов, ожидающих ответа
 
@@ -57,6 +61,7 @@ private:
 	int local_id;
 	std::string name;
 	std::string caption;
+	std::string cluster;
 	std::string uniq_id;
 	sockaddr_in remote_addr;
 	std::vector<sockaddr_in> alternate_addrs;

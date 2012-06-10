@@ -7,7 +7,7 @@
 
 #include <unistd.h>
 #include "p2vera.h"
-#include "net_find.h"
+#include "inet_find.h"
 
 int main(int argc, char *argv[]) {
 	P2Vera* p2v = new P2Vera();
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
 	nfc.nf_address = "127.0.01"; //В тестовом режиме запускаемся на локалхосте
 	nfc.nf_port    = "7300";
 	nfc.nf_hash    = p2v->get_uniq_id();
-	NetFind* nf = new NetFind(&nfc);
+	INetFind* nf = net_find_create(&nfc);
 	nf->add_scanable_server("127.0.0.1", "7300");
 	nf->add_broadcast_servers("7300");
 	while(true) {

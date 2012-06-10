@@ -25,6 +25,9 @@
 #include "net_find_ifaces.h"
 #include "net_find_handlers.h"
 
+#include "inet_find.h"
+#include "mtx_containers.hpp"
+
 #define MAX_FAILURES_COUNT 5
 #define MAX_PING_RESP_TIMEOUT 1
 
@@ -33,18 +36,6 @@ class NetFindLinkHandler;
 
 void* nf_server_rsp_thread_fcn (void* thread_arg);
 void* nf_client_thread_fcn (void* thread_arg);
-
-//Конфигурация модуля поиска приложений в сети
-typedef struct _net_find_config {
-	std::string nf_name;    // Кодовое название этой части приложения
-	std::string nf_caption; // Полное  название этой части приложения
-	std::string nf_address; // IP адрес, на котором обнаружен сервер
-	std::string nf_port;    // Порт, на котором должен запускаться сервер
-	std::string nf_hash;    // Идентификатор экземпляра приложения
-	int usage;              // Степень использования этого приложения. Меньше - лучше.
-	bool scanable;          // Необходимость пинга сервера. При ложном значении сервер считается
-	                        // работоспособным, его пинг запрещен
-} net_find_config;
 
 typedef struct _rmt_ping {
 	int ping_id;
@@ -55,57 +46,32 @@ typedef struct _rmt_ping {
 	_rmt_ping& operator=(const _rmt_ping& rmtp);
 } rmt_ping;
 
-class IRemoteNfServer {
-public:
-	virtual bool is_alive() = 0;      //Проверить возможность установки связи с этим приложением.
-						  //Не гарантирует жизнеспособность приложения в текущий момент,
-						  //опирается на наличие ответов в недавнем прошлом.
-	virtual void forbide_usage() = 0; //Запретить проверку этого приложения на жизнеспособность,
-						  //принудительно считать приложение отсутствующим.
-						  //Т.к. на удаленной машине существует только один сервер с указаным
-						  //портом, машины различаются только ip-адресами. Поэтому блокировка
-						  //одного сервера означает полную блокировку удаленной машины
-	virtual void enable_usage() = 0;  //Разрешает работу с этим сервером, т.е. с любым сервером,
-						  //расположенным на этой удаленной машине
-
-	virtual int get_id() = 0; //Получение идентификатора сервера в пределах этого приложения
-	virtual std::string get_uniq_id() = 0;   //Получение уникального идентификатора
-	virtual sockaddr_in& get_remote_sockaddr() = 0;
-	virtual void add_alternate_addr(sockaddr_in& alt_addr) = 0; //Добавить альтернативный адрес, по которому можно найти этот сервер
-	virtual bool validate_addr(sockaddr_in& alt_addr) = 0; //Проверить переданный адрес на принадлежность к этому серверу
-
-	virtual void add_ping_request(int ping_id) = 0;  //Регистрация отправленного запроса
-	virtual void add_ping_response(int ping_id) = 0; //Регистрация принятого ответа
-	virtual void validate_alive() = 0;               //Проверка на количество потеряных запросов-ответов за единицу времени
-	virtual bool ping_allowed() = 0;                 //Проверка возможности пинга. Пинг может быть запрещен, т.к. запрещено
-										 //использование этого удаленного сервера или не прошел минимальный период ожидания
-										 //с момента отправки последнего пинга.
-
-	virtual bool is_broadcast() = 0; // Сервер на самом деле не существует, а используется для хранения информации о вещательных запросах
-};
 
 //Класс обеспечивает поиск приложений, работающих в одной сети с ним на одном порту
 //На локальной машине может выполнять функции клиента или сервера с переходом в режим
 //сервера в случае падения предыдущего сервера.
-class NetFind {
+class NetFind : public INetFind {
 public:
 	NetFind(net_find_config *nfc);
-	bool is_server(); //Позволяет проверить текущий режим этой копии библиотеки
-	int add_scanable_server(std::string address, std::string port);
-	int add_unscanable_server(std::string address, std::string port);
-	int add_broadcast_servers(std::string port); //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
+	virtual bool is_server(); //Позволяет проверить текущий режим этой копии библиотеки
+	virtual int add_scanable_server(std::string address, std::string port);
+	virtual int add_broadcast_servers(std::string port); //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
+	virtual int add_discovered_server(sockaddr_in& addr, std::string uniq_id);
 
-	int add_discovered_server(sockaddr_in& addr, std::string uniq_id);
+	virtual IRemoteNfServer* by_id(int id);                    //Поиск сервера по его локальному id
+	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa);     //Поиск сервера по его обратному адресу
+	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id); //Поиск сервера по его уникальному идентификатору
+	virtual void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
+	virtual void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
-	IRemoteNfServer* by_id(int id);                    //Поиск сервера по его локальному id
-	IRemoteNfServer* by_sockaddr(sockaddr_in& sa);     //Поиск сервера по его обратному адресу
-	IRemoteNfServer* by_uniq_id(std::string uniq_id); //Поиск сервера по его уникальному идентификатору
-	void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
-	void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
+	virtual std::string get_uniq_id();
+	virtual std::string get_name();
+	virtual std::string get_caption();
+	virtual std::string get_cluster();
 
-	unsigned int get_server_port();
+	virtual unsigned int get_server_port();
 	virtual unsigned int get_client_port();
-	std::string get_uniq_id();
+
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
 private:
@@ -115,6 +81,7 @@ private:
 
 	std::list<IRemoteNfServer*> ping_list;   //Список серверов, которые должны опрошены в этой итерации
 	std::list<IRemoteNfServer*> remove_list; //Список серверов, ожидающих удаления
+	mtx_queue<IRemoteNfServer*> info_list;   //Список серверов, о которых необходимо получить информацию
 
 	int last_remote_id;
 	pthread_mutex_t mtx;
@@ -149,6 +116,7 @@ private:
 
 	std::string name;
 	std::string caption;
+	std::string cluster;
 	std::string hash;
 };
 

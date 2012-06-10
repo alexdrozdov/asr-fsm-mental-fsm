@@ -22,6 +22,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	local_id = id;
 	name = rnfc->nf_name;
 	caption = rnfc->nf_caption;
+	cluster = rnfc->nf_cluster;
 	uniq_id = rnfc->nf_hash;
 	if (rnfc->nf_hash.length()<1) {
 		is_addr_placeholder = true;
@@ -30,6 +31,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	}
 	enabled = true;
 	failure_count = 0;
+	full_info_present = false;
 
 	memset(&remote_addr, 0 , sizeof(sockaddr_in));
 	remote_addr.sin_family = AF_INET;
@@ -48,9 +50,11 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 	name = rnfc->nf_name;
 	caption = rnfc->nf_caption;
 	uniq_id = rnfc->nf_hash;
+	cluster = rnfc->nf_cluster;
 	enabled = true;
 	failure_count = 0;
 	is_addr_placeholder = false;
+	full_info_present = false;
 
 	memcpy(&remote_addr, &addr, sizeof(sockaddr_in));
 	alternate_addrs.push_back(addr);
@@ -171,6 +175,30 @@ bool RemoteNfServer::validate_addr(sockaddr_in& alt_addr) {
 	return false;
 }
 
+bool RemoteNfServer::update_info(net_find_config* rnfc) {
+	if (NULL == rnfc) return false;
+
+	bool complete = true;
+	if (rnfc->nf_caption.length() > 0) {
+		caption = rnfc->nf_caption;
+	} else {
+		complete = false;
+	}
+	if (rnfc->nf_name.length() > 0) {
+		name = rnfc->nf_name;
+	} else {
+		complete = false;
+	}
+	if (rnfc->nf_cluster.length() > 0) {
+		cluster = rnfc->nf_cluster;
+	} else {
+		complete = false;
+	}
+
+	full_info_present = complete;
+	return complete;
+}
+
 bool RemoteNfServer::ping_allowed() {
 	if (!enabled) return false;
 
@@ -182,6 +210,14 @@ bool RemoteNfServer::ping_allowed() {
 	}
 	return true; //Можно пиговать
 }
+
+bool RemoteNfServer::requires_info_request() {
+	if (!is_addr_placeholder && !full_info_present) {
+		return true; //Сервер был обнаружен в сети, при этом полная информация о нем недоступна. Ее необходимо получить.
+	}
+	return false; //Сервер либо просто хранит адрес (в этом случае ничего запрашивать не надо), либо о нем уже все известно
+}
+
 //Сервер является физическим, а не виртуальным вещательным
 bool RemoteNfServer::is_broadcast() {
 	return false;
