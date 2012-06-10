@@ -29,6 +29,7 @@
 #include "mtx_containers.hpp"
 
 #define MAX_RSP_RCV_BUFLEN 1024
+#define MIN_REVIEW_PERIOD 330
 
 using namespace std;
 using namespace p2vera;
@@ -103,7 +104,7 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc, addr);
 
 	pthread_mutex_lock(&mtx);
-	remote_servers.push_back(rnfs);
+	remote_servers[remote_id] = rnfs;
 	m_str_servers[uniq_id] = rnfs;
 	reg_to_sockaddr(addr, rnfs);
 	pthread_mutex_unlock(&mtx);
@@ -118,7 +119,6 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 }
 
 int NetFind::add_scanable_server(std::string address, std::string port) {
-	//FIXME Уникальный идентификатор должен добавляться к каждому вновь создаваемому удаленному хосту
 	net_find_config nfc;
 	nfc.nf_address = address;
 	nfc.nf_port = port;
@@ -131,7 +131,7 @@ int NetFind::add_scanable_server(std::string address, std::string port) {
 	int remote_id = generate_remote_id();
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc);
 	pthread_mutex_lock(&mtx);
-	remote_servers.push_back(rnfs);
+	remote_servers[remote_id] = rnfs;
 	pthread_mutex_unlock(&mtx);
 
 	return remote_id;
@@ -141,19 +141,24 @@ int NetFind::add_broadcast_servers(std::string port) {
 	net_find_config nfc;
 	nfc.nf_port = port;
 
-	BkstNfServer* bnfs = new BkstNfServer(generate_remote_id(), &nfc);
+	int remote_id = generate_remote_id();
+	BkstNfServer* bnfs = new BkstNfServer(remote_id, &nfc);
 	pthread_mutex_lock(&mtx);
-	remote_servers.push_back(bnfs);
+	remote_servers[remote_id] = bnfs;
 	pthread_mutex_unlock(&mtx);
 	return 0;
 }
 
 //Поиск сервера по его локальному id
 IRemoteNfServer* NetFind::by_id(int id) {
-	if (id<0 || id>=(int)remote_servers.size()) {
-		return NULL;
+	IRemoteNfServer* irnfs = NULL;
+	pthread_mutex_lock(&mtx);
+	map<int, IRemoteNfServer*>::iterator it = remote_servers.find(id);
+	if (it != remote_servers.end()) {
+		irnfs = it->second;
 	}
-	return remote_servers[id];
+	pthread_mutex_unlock(&mtx);
+	return irnfs;
 }
 
 //Поиск сервера по его обратному адресу
@@ -203,10 +208,10 @@ void NetFind::remove_remote_server(int id) {
 //Вывод в консоль списка известных серверов с их статусами
 void NetFind::print_servers() {
 	pthread_mutex_lock(&mtx);
-	vector<IRemoteNfServer*>::iterator it;
+	map<int,IRemoteNfServer*>::iterator it;
 	int count = 0;
 	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
-		IRemoteNfServer* irnfs = *it;
+		IRemoteNfServer* irnfs = it->second;
 		if (NULL == irnfs) continue;
 		irnfs->print_info();
 		cout << endl;
@@ -325,10 +330,10 @@ bool NetFind::receive_udp_message(int socket) {
 void NetFind::review_remote_servers() {
 	ping_list.clear();
 
-	vector<IRemoteNfServer*>::iterator it_rs;
+	map<int,IRemoteNfServer*>::iterator it_rs;
 	pthread_mutex_lock(&mtx);
 	for (it_rs=remote_servers.begin();it_rs!=remote_servers.end();it_rs++) {
-		IRemoteNfServer* irnfs = *it_rs;
+		IRemoteNfServer* irnfs = it_rs->second;
 		if (NULL == irnfs) continue; //Этот сервер уже был удален
 		irnfs->validate_alive(); //Проверяем, что сервер пингуется
 		if (!irnfs->is_alive() && !irnfs->is_broadcast()) {
@@ -363,12 +368,15 @@ void NetFind::unlink_server(IRemoteNfServer* irnfs) {
 	int nid = irnfs->get_id();
 
 	string uniq_id = irnfs->get_uniq_id();
-	map<std::string, IRemoteNfServer*>::iterator it_id = m_str_servers.find(uniq_id);
-	if (it_id != m_str_servers.end()) {
-		m_str_servers.erase(it_id);
+	map<std::string, IRemoteNfServer*>::iterator it_uid = m_str_servers.find(uniq_id);
+	if (it_uid != m_str_servers.end()) {
+		m_str_servers.erase(it_uid);
 	}
 
-	remote_servers[nid] = NULL;
+	map<int, IRemoteNfServer*>::iterator it_id = remote_servers.find(nid);
+	if (it_id != remote_servers.end()) {
+		remote_servers.erase(it_id);
+	}
 
 	//FIXED Удалять запись из списка адресов нельзя, т.к. она уже может быть занята другим приложением,
 	//запустившимся на той же машине и занявшим тот же порт.
@@ -391,9 +399,18 @@ int NetFind::client_thread() {
 		pfd.events = POLLIN | POLLHUP;
 		pfd.revents = 0;
 
+
+		timeval tv_prev;
+		gettimeofday(&tv_prev, NULL);
 		while (true) {
-			review_remote_servers();
-			invoke_requests();
+			timeval tv_now;
+			gettimeofday(&tv_now, NULL);
+			unsigned  int delta = ((1000000-tv_prev.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-tv_prev.tv_sec)*1000000) / 1000;
+			if (delta >= MIN_REVIEW_PERIOD) {
+				review_remote_servers();
+				invoke_requests();
+				memcpy(&tv_prev, &tv_now, sizeof(timeval));
+			}
 
 			if (poll(&pfd, 1, 100) < 1) {
 				continue;

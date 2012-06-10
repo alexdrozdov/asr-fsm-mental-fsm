@@ -75,7 +75,7 @@ public:
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
 private:
-	std::vector<IRemoteNfServer*> remote_servers;           //Массив удаленных серверов
+	std::map<int, IRemoteNfServer*> remote_servers;           //Массив удаленных серверов
 	std::map<unsigned long long, IRemoteNfServer*> m_sa_servers;   //Массив серверов, проиндексированный по sockaddr
 	std::map<std::string, IRemoteNfServer*> m_str_servers;  //Массив серверов, проиндексированный по уникальным идентификаторам
 
