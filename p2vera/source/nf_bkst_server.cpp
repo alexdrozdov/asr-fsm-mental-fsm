@@ -19,6 +19,8 @@ BkstNfServer::BkstNfServer(int id, net_find_config* rnfc) {
 	local_id = id;
 	enabled = true;
 
+	gettimeofday(&tv_request, NULL);
+
 	memset(&remote_addr, 0, sizeof(sockaddr_in));
 	remote_addr.sin_family = AF_INET;
 	remote_addr.sin_port = htons(atoi(rnfc->nf_port.c_str()));
@@ -88,6 +90,10 @@ bool BkstNfServer::requires_info_request() {
 //Сервер не существует в реальности а представляет все сервера, которые можно обнаружить вещательным запросом
 bool BkstNfServer::is_broadcast() {
 	return true;
+}
+
+bool BkstNfServer::is_localhost() {
+	return false;
 }
 
 void BkstNfServer::print_info() {

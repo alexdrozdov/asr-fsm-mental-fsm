@@ -64,6 +64,8 @@ public:
 	virtual void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
 	virtual void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
+	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list);
+
 	virtual std::string get_uniq_id();
 	virtual std::string get_name();
 	virtual std::string get_caption();
@@ -71,6 +73,8 @@ public:
 
 	virtual unsigned int get_server_port();
 	virtual unsigned int get_client_port();
+
+	virtual bool is_localhost(sockaddr_in& sa); //Проверят, относится ли ip адрес к этому компьютеру
 
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
@@ -95,6 +99,9 @@ private:
 	unsigned int server_port;
 	unsigned int client_port;
 
+	bool is_local_server; //Признак того, что эта копия библиотеки захватила основной порт и выполняет роль сервера
+	std::vector<sockaddr_in> local_ips; //Массив локальных ip адресов
+
 	int generate_remote_id();     //Формирование уникальных идентификаторв для найденных серверов
 	int server_response_thread(); //Поток сервера. Формирует ответы на запросы клиентов
 	int server_route_thread();    //Поток сервера. Обеспечивает построение маршрутов (пока не уверен)
@@ -107,12 +114,14 @@ private:
 	void review_remote_servers();
 	void unlink_server(IRemoteNfServer* irnfs); //Начать удаление сервера
 
+	virtual void load_ifinfo();
 	void reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* rnfs);   //Привязка сервера к его адресу
 
 	std::map<int, INetFindMsgHandler*> msg_handlers; //Обработчики сетевых сообщений, приходящих по протоколу UDP
 
 	NetFindLinkHandler *link_handler;
 	NetFindInfoHandler *info_handler;
+	NetFindListHandler *list_handler;
 
 	std::string name;
 	std::string caption;

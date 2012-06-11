@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <ifaddrs.h>
 #include <sys/poll.h>
 
 #include <iostream>
@@ -60,6 +61,8 @@ NetFind::NetFind(net_find_config *nfc) {
 
 	last_remote_id = 0; //Идентификатор последнего найденного сервера
 
+	load_ifinfo(); //Получаем информацию о локальных сетевых адресах
+
 	//Создаем мутексы
 	pthread_mutex_init (&mtx, NULL);
 
@@ -72,17 +75,46 @@ NetFind::NetFind(net_find_config *nfc) {
 	//Создаем обработчики сообщений
 	link_handler = new NetFindLinkHandler(this, 0);
 	info_handler = new NetFindInfoHandler(this, 1);
+	list_handler = new NetFindListHandler(this, 2);
 	msg_handlers[0] = link_handler;
 	msg_handlers[1] = info_handler;
+	msg_handlers[2] = list_handler;
 
 	//Создаем потоки
 	pthread_t thread_id;
 	pthread_create(&thread_id, NULL, &nf_server_rsp_thread_fcn, this); //Поток, выполняющий роль сервера
 	pthread_create(&thread_id, NULL, &nf_client_thread_fcn, this); //Поток, выполняющий роль сервера
 }
+
+void NetFind::load_ifinfo() {
+	struct ifaddrs *ifa_ptr, *ifa_ptr_tmp;
+
+	if (getifaddrs(&ifa_ptr)!=0) {
+		perror("ERROR getifaddrs: ");
+		return;
+	}
+	for (ifa_ptr_tmp=ifa_ptr; ifa_ptr_tmp->ifa_next!=NULL; ifa_ptr_tmp=ifa_ptr_tmp->ifa_next) {
+		if (ifa_ptr_tmp->ifa_addr->sa_family!=AF_INET)
+			continue;
+		local_ips.push_back(*((struct sockaddr_in *)(ifa_ptr_tmp->ifa_addr)));
+	}
+	freeifaddrs(ifa_ptr);
+}
+
+bool NetFind::is_localhost(sockaddr_in& sa) {
+	vector<sockaddr_in>::iterator it;
+	for (it=local_ips.begin();it!=local_ips.end();it++) {
+		if (it->sin_addr.s_addr==sa.sin_addr.s_addr) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
 //Позволяет проверить текущий режим этой копии библиотеки
 bool NetFind::is_server() {
-	return false;
+	return is_local_server;
 }
 
 int NetFind::generate_remote_id() {
@@ -93,6 +125,14 @@ int NetFind::generate_remote_id() {
 }
 
 int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
+	if (NULL != by_uniq_id(uniq_id)) {
+		return -1;
+	}
+	bool b_localhost = is_localhost(addr);
+	if (b_localhost &&  htons(addr.sin_port)==get_server_port()) {
+		return -1; //Это локальный сервер. Как он оказался среди всего этого непонятно, но добавлять его не стоит
+	}
+
 	net_find_config nfc;
 	nfc.nf_caption = "unknown";
 	nfc.nf_name = "unknown";
@@ -102,6 +142,13 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 
 	int remote_id = generate_remote_id();
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc, addr);
+	if (b_localhost) { //Для серверов, работающих на локальной машине добавляем все адреса, с которых могут приходить ответы
+		rnfs->is_localhost(true);
+		vector<sockaddr_in>::iterator it;
+		for (it=local_ips.begin();it!=local_ips.end();it++) {
+			rnfs->add_alternate_addr(*it);
+		}
+	}
 
 	pthread_mutex_lock(&mtx);
 	remote_servers[remote_id] = rnfs;
@@ -221,6 +268,18 @@ void NetFind::print_servers() {
 	pthread_mutex_unlock(&mtx);
 }
 
+void NetFind::get_alive_servers(std::list<IRemoteNfServer*>& srv_list) {
+	srv_list.clear();
+	pthread_mutex_lock(&mtx);
+	map<int,IRemoteNfServer*>::iterator it;
+	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
+		IRemoteNfServer* irnfs = it->second;
+		if (NULL == irnfs) continue;
+		srv_list.push_back(irnfs);
+	}
+	pthread_mutex_unlock(&mtx);
+}
+
 unsigned int NetFind::get_server_port() {
 	return server_port;
 }
@@ -247,6 +306,7 @@ std::string NetFind::get_cluster() {
 
 //Поток сервера. Формирует ответы на запросы клиентов
 int NetFind::server_response_thread() {
+	is_local_server = false;
 	while (true) {
 		//Пытаемся открыть слушающий UDP сокет.
 		sock_srv_rsp = socket(AF_INET, SOCK_DGRAM, 0);
@@ -259,7 +319,9 @@ int NetFind::server_response_thread() {
 
 		//Сокет открылся. Значит, мы стали сервером. Переходим в основной цикл сервера
 		cout << "NetFind::server_response_thread info - переход в режим ведущего" << endl;
+		is_local_server = true;
 		while (receive_udp_message(sock_srv_rsp));
+		is_local_server = false;
 	}
 	return 0;
 }
@@ -356,6 +418,11 @@ void NetFind::invoke_requests() {
 	//Собираем информацию с вновь обнаруженных серверов
 	while (info_list.size()) {
 		info_handler->InvokeRequest(info_list.pop_front());
+	}
+
+	//При необходимости собираем информацию о других серверах, работающих на этом хосте
+	if (list_handler->requires_server_list()) {
+		list_handler->RequestLocalhost();
 	}
 }
 

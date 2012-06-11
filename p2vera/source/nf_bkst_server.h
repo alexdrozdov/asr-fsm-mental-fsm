@@ -29,6 +29,7 @@ public:
 	virtual bool validate_addr(sockaddr_in& alt_addr);
 	virtual bool requires_info_request();
 	virtual bool is_broadcast();
+	virtual bool is_localhost();
 	virtual void print_info();
 private:
 	bool enabled;

@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 
 #include <string>
+#include <list>
 
 //Конфигурация модуля поиска приложений в сети
 typedef struct _net_find_config {
@@ -53,9 +54,9 @@ public:
 	virtual bool requires_info_request() = 0; //Сервер нуждается в сборе дополнительной информации
 
 	virtual bool is_broadcast() = 0; // Сервер на самом деле не существует, а используется для хранения информации о вещательных запросах
+	virtual bool is_localhost() = 0; // Сервер рабоает на тойже машине, что и эта копия библиотеки
 	virtual void print_info() = 0;   // Вывести параметры сервера в консоль
 };
-
 
 class INetFind {
 public:
@@ -67,6 +68,8 @@ public:
 	virtual IRemoteNfServer* by_id(int id) = 0;                    //Поиск сервера по его локальному id
 	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa) = 0;     //Поиск сервера по его обратному адресу
 	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id) = 0; //Поиск сервера по его уникальному идентификатору
+
+	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list) = 0; //Заполняет список действующих серверов.
 
 	virtual void print_servers() = 0;
 

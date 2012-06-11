@@ -58,3 +58,18 @@ message msg_info_rsp {
 	optional string caption       = 5; //Расшифровка названия в человеко читаемом виде
 	repeated p2v_channel channels = 6; //Список каналов, в которых может работать этот сервер
 }
+
+message msg_srvlist_rq {
+	required int32 rp_port           = 1; //Порт, на который следует прислать ответ
+	optional bool list_non_localhost = 2; //Если установлено - отправить адреса не только локальных серверов, но и находящихся на других машинах
+}
+
+message msg_srvlist_rsp {
+	message srv_addr {
+		required string addr    = 1;
+		required string port    = 2;
+		required string uniq_id = 3;
+	}
+	repeated srv_addr srv_addrs = 1;
+}
+

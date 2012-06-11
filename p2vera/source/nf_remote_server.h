@@ -44,6 +44,8 @@ public:
 	virtual bool requires_info_request();
 
 	virtual bool is_broadcast();
+	virtual bool is_localhost();
+	virtual void is_localhost(bool b);
 	virtual void print_info();
 
 	//friend class NetFind;
@@ -54,6 +56,7 @@ private:
 	bool is_addr_placeholder; //Сервер хранит адрес, по которому можно найти реально работающее приложение.
 	                          //Добавлен порльзователем, поэтому не имеет уникального идентификатора
 	bool full_info_present;   //Вся информация о сервере получена и хранится в этом объекте. В противном случае ее необходимо получить
+	bool localhost;
 	pthread_mutex_t mtx;
 	std::map<int, rmt_ping> pings_sent; //Список отправленных запросов, ожидающих ответа
 

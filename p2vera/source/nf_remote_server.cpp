@@ -32,9 +32,11 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	enabled = true;
 	failure_count = 0;
 	full_info_present = false;
+	localhost = false;
 
 	memset(&remote_addr, 0 , sizeof(sockaddr_in));
 	remote_addr.sin_family = AF_INET;
+
 	remote_addr.sin_port = htons(atoi(rnfc->nf_port.c_str()));
 	if (0 == inet_aton(rnfc->nf_address.c_str(), &(remote_addr.sin_addr))) {
 		cout << "RemoteNfServer::RemoteNfServer error: wrong server address" << endl;
@@ -55,6 +57,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 	failure_count = 0;
 	is_addr_placeholder = false;
 	full_info_present = false;
+	localhost = false;
 
 	memcpy(&remote_addr, &addr, sizeof(sockaddr_in));
 	alternate_addrs.push_back(addr);
@@ -96,15 +99,14 @@ sockaddr_in&  RemoteNfServer::get_remote_sockaddr() {
 
 //Регистрация отправленного запроса
 void RemoteNfServer::add_ping_request(int ping_id) {
+	if (is_addr_placeholder) return; //Регистрировать что либо на несущесвующий хост не стоит.
 	gettimeofday(&tv_request, NULL);
 	if (pings_sent.size() >= MAX_PING_QQ_SIZE) {
 		//Просмотреть пинги в словаре и удалить все самое старое
-		timeval tv_now;
-		gettimeofday(&tv_now, NULL);
 		map<int, rmt_ping>::iterator it;
 		for (it=pings_sent.begin();it!=pings_sent.end();it++) {
 			rmt_ping& rmtp = it->second;
-			unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_now.tv_usec-1000000)+(tv_now.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
+			unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_request.tv_usec-1000000)+(tv_request.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
 			if (delta>MAX_PING_TIMEOUT) {
 				pings_sent.erase(it,it);
 				failure_count++;
@@ -221,6 +223,14 @@ bool RemoteNfServer::requires_info_request() {
 //Сервер является физическим, а не виртуальным вещательным
 bool RemoteNfServer::is_broadcast() {
 	return false;
+}
+
+bool RemoteNfServer::is_localhost() {
+	return localhost;
+}
+
+void RemoteNfServer::is_localhost(bool b) {
+	localhost = b;
 }
 
 void RemoteNfServer::print_info() {
