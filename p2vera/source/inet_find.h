@@ -65,7 +65,6 @@ public:
 	virtual int add_scanable_server(std::string address, std::string port) = 0;
 	virtual int add_broadcast_servers(std::string port) = 0; //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
 
-	virtual IRemoteNfServer* by_id(int id) = 0;                    //Поиск сервера по его локальному id
 	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa) = 0;     //Поиск сервера по его обратному адресу
 	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id) = 0; //Поиск сервера по его уникальному идентификатору
 

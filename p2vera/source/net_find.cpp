@@ -151,7 +151,7 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 	}
 
 	pthread_mutex_lock(&mtx);
-	remote_servers[remote_id] = rnfs;
+	remote_servers.push_back(rnfs);
 	m_str_servers[uniq_id] = rnfs;
 	reg_to_sockaddr(addr, rnfs);
 	pthread_mutex_unlock(&mtx);
@@ -178,7 +178,7 @@ int NetFind::add_scanable_server(std::string address, std::string port) {
 	int remote_id = generate_remote_id();
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc);
 	pthread_mutex_lock(&mtx);
-	remote_servers[remote_id] = rnfs;
+	remote_servers.push_back(rnfs);
 	pthread_mutex_unlock(&mtx);
 
 	return remote_id;
@@ -191,21 +191,9 @@ int NetFind::add_broadcast_servers(std::string port) {
 	int remote_id = generate_remote_id();
 	BkstNfServer* bnfs = new BkstNfServer(remote_id, &nfc);
 	pthread_mutex_lock(&mtx);
-	remote_servers[remote_id] = bnfs;
+	remote_servers.push_back(bnfs);
 	pthread_mutex_unlock(&mtx);
 	return 0;
-}
-
-//Поиск сервера по его локальному id
-IRemoteNfServer* NetFind::by_id(int id) {
-	IRemoteNfServer* irnfs = NULL;
-	pthread_mutex_lock(&mtx);
-	map<int, IRemoteNfServer*>::iterator it = remote_servers.find(id);
-	if (it != remote_servers.end()) {
-		irnfs = it->second;
-	}
-	pthread_mutex_unlock(&mtx);
-	return irnfs;
 }
 
 //Поиск сервера по его обратному адресу
@@ -255,10 +243,10 @@ void NetFind::remove_remote_server(int id) {
 //Вывод в консоль списка известных серверов с их статусами
 void NetFind::print_servers() {
 	pthread_mutex_lock(&mtx);
-	map<int,IRemoteNfServer*>::iterator it;
+	list<IRemoteNfServer*>::iterator it;
 	int count = 0;
 	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
-		IRemoteNfServer* irnfs = it->second;
+		IRemoteNfServer* irnfs = *it;
 		if (NULL == irnfs) continue;
 		irnfs->print_info();
 		cout << endl;
@@ -271,9 +259,9 @@ void NetFind::print_servers() {
 void NetFind::get_alive_servers(std::list<IRemoteNfServer*>& srv_list) {
 	srv_list.clear();
 	pthread_mutex_lock(&mtx);
-	map<int,IRemoteNfServer*>::iterator it;
+	list<IRemoteNfServer*>::iterator it;
 	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
-		IRemoteNfServer* irnfs = it->second;
+		IRemoteNfServer* irnfs = *it;
 		if (NULL == irnfs) continue;
 		srv_list.push_back(irnfs);
 	}
@@ -404,19 +392,21 @@ bool NetFind::receive_udp_message(int socket) {
 void NetFind::review_remote_servers() {
 	ping_list.clear();
 
-	map<int,IRemoteNfServer*>::iterator it_rs;
+	list<IRemoteNfServer*>::iterator it_rs;
 	pthread_mutex_lock(&mtx);
-	for (it_rs=remote_servers.begin();it_rs!=remote_servers.end();it_rs++) {
-		IRemoteNfServer* irnfs = it_rs->second;
+	for (it_rs=remote_servers.begin();it_rs!=remote_servers.end();) {
+		IRemoteNfServer* irnfs = *it_rs;
 		if (NULL == irnfs) continue; //Этот сервер уже был удален
 		irnfs->validate_alive(); //Проверяем, что сервер пингуется
 		if (!irnfs->is_alive() && !irnfs->is_broadcast()) {
 			unlink_server(irnfs); //Сервер недоступен. Подготовить его к удалению
+			it_rs = remote_servers.erase(it_rs);
 			continue;
 		}
 		if (irnfs->ping_allowed()) {
 			ping_list.push_back(irnfs);
 		}
+		++it_rs;
 	}
 	pthread_mutex_unlock(&mtx);
 }
@@ -444,26 +434,11 @@ void NetFind::unlink_server(IRemoteNfServer* irnfs) {
 	if (NULL == irnfs) return;
 	remove_list.push_back(irnfs);
 
-	int nid = irnfs->get_id();
-
 	string uniq_id = irnfs->get_uniq_id();
 	map<std::string, IRemoteNfServer*>::iterator it_uid = m_str_servers.find(uniq_id);
 	if (it_uid != m_str_servers.end()) {
 		m_str_servers.erase(it_uid);
 	}
-
-	map<int, IRemoteNfServer*>::iterator it_id = remote_servers.find(nid);
-	if (it_id != remote_servers.end()) {
-		remote_servers.erase(it_id);
-	}
-
-	//FIXED Удалять запись из списка адресов нельзя, т.к. она уже может быть занята другим приложением,
-	//запустившимся на той же машине и занявшим тот же порт.
-	//unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
-	//map<unsigned long long, IRemoteNfServer*>::iterator it_sa = m_sa_servers.find(lsa);
-	//if (it_sa!=m_sa_servers.end()) {
-	//	m_sa_servers.erase(it_sa);
-	//}
 }
 
 //Поток клиента.

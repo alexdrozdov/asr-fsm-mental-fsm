@@ -58,7 +58,6 @@ public:
 	virtual int add_broadcast_servers(std::string port); //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
 	virtual int add_discovered_server(sockaddr_in& addr, std::string uniq_id);
 
-	virtual IRemoteNfServer* by_id(int id);                    //Поиск сервера по его локальному id
 	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa);     //Поиск сервера по его обратному адресу
 	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id); //Поиск сервера по его уникальному идентификатору
 	virtual void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
@@ -79,7 +78,7 @@ public:
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
 private:
-	std::map<int, IRemoteNfServer*> remote_servers;           //Массив удаленных серверов
+	std::list<IRemoteNfServer*> remote_servers;           //Массив удаленных серверов
 	std::map<unsigned long long, IRemoteNfServer*> m_sa_servers;   //Массив серверов, проиндексированный по sockaddr
 	std::map<std::string, IRemoteNfServer*> m_str_servers;  //Массив серверов, проиндексированный по уникальным идентификаторам
 
