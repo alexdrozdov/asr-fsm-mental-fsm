@@ -29,7 +29,7 @@
 #include "mtx_containers.h"
 #include "mtx_containers.hpp"
 
-#define MAX_RSP_RCV_BUFLEN 1024
+#define MAX_RSP_RCV_BUFLEN 65536
 #define MIN_REVIEW_PERIOD 330
 
 using namespace std;
@@ -368,6 +368,18 @@ bool NetFind::receive_udp_message(int socket) {
 	msg_wrapper wrpr;
 	if (!wrpr.ParseFromArray(rcv_buf, rc)) {
 		cout << "NetFind::receive_udp_message error - couldn`t parse wrapper" << endl;
+		cout << "Trying to parse it partially..." << endl;
+		if (!wrpr.ParsePartialFromArray(rcv_buf, rc)) {
+			cout << "completely failed" << endl;
+			cout << "Dumping message:" << endl;
+			cout << "Message size: " << rc << endl;
+			cout << "Message data:" << endl;
+			for (int i=0;i<rc;i++) {
+				cout << hex << " 0x" << (int)rcv_buf[i];
+			}
+			cout << dec << endl;
+			return true;
+		}
 		return true;
 	}
 	if (!wrpr.has_body()) {
