@@ -67,7 +67,7 @@ PROTO_OBJ=$(PROTO_CC:%.cc=./obj/%.o)
 
 all:$(BUILD_DIR)/$(PROG) log_v1 neuro_v1 pcre_v1 $(install_targets)
 
-$(BUILD_DIR)/$(PROG): dirs xmlsup $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
+$(BUILD_DIR)/$(PROG): dirs p2vera xmlsup $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 	@echo [LD] $(PROG); \
 	$(CCP) $(OBJS) $(PROTO_OBJ) $(LDFLAGS) -o $(BUILD_DIR)/$(PROG)
 
@@ -112,6 +112,9 @@ pcre_v1 : FORCE xmlsup
 	
 xmlsup : FORCE
 	@$(MAKE) -C ./xml_support/
+	
+p2vera : FORCE
+	@$(MAKE) -C ./p2vera/source/
 
 clean:
 	rm -rf $(BUILD_DIR) *.pb.cc *.pb.h

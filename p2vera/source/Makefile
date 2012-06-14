@@ -2,21 +2,17 @@ CFLAGS=-Wall -O0 -c -g3
 
 OS=$(shell uname -s)
 ifeq ($(OS),Darwin)
-	CFLAGS_AUX= `pkg-config --cflags libxml-2.0` \
-          `pkg-config --cflags libpcre` \
-          -I ./xml_support/ \
-          -I ../../aux-packages/tcl8.5.9/generic/ \
-          -I ../../aux-packages/build/include/ \
+	CFLAGS_AUX= -I ../../../../aux-packages/build/include/ \
           -DMACOSX -DAUXPACKAGES
     install_targets=install.macos
-    PROTOC_PATH=$(shell pwd)/../../aux-packages/build/bin/
+    PROTOC_PATH=$(shell pwd)/../../../../aux-packages/build/bin/
     
     LDFLAGS=-ltcl8.5 \
         -lpthread -lssl -lcrypto \
         -ldl \
-        -L ./xml_support/obj/ -lxmlsup  \
-        -L ../../aux-packages/build/lib/ -lprotobuf \
-        -rdynamic
+        -L ../../../../aux-packages/build/lib/ -lprotobuf \
+        -shared
+    LIB_EXT=dylib
 else
 ifeq ($(AUXBUILD),AUX)
 	CFLAGS_AUX= `pkg-config --cflags libxml-2.0` \
@@ -57,7 +53,7 @@ PROTO=$(wildcard *.proto)
 PROTO_CC=$(PROTO:%.proto=%.pb.cc)
 PROTO_OBJ=$(PROTO_CC:%.cc=./obj/%.o)
 
-all:$(BUILD_DIR)/$(PROG) $(install_targets)
+all:$(BUILD_DIR)/$(PROG) $(install_targets) netfindtest
 
 $(BUILD_DIR)/$(PROG): dirs $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 	@echo [LD] $(PROG); \
@@ -68,8 +64,7 @@ install.gnulinux: FORCE
 	@echo Done
 	
 install.macos: FORCE
-	@install_name_tool -change ./obj/libxmlsup.dylib  @executable_path/libs/libxmlsup.dylib $(BUILD_DIR)/$(PROG)
-	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libs/libprotobuf.7.dylib $(BUILD_DIR)/$(PROG)
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(PROG)
 	@cp $(BUILD_DIR)/$(PROG) ../bin/
 	@echo Done
 
@@ -91,7 +86,8 @@ $(BUILD_DIR)/%.o: %.cc
 
 include $(wildcard $(BUILD_DIR)/*.d) 
 
-
+netfindtest : FORCE
+	@$(MAKE) -C ./tests/
 
 clean:
 	rm -rf $(BUILD_DIR) *.pb.cc *.pb.h	

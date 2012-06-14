@@ -2,20 +2,16 @@ CFLAGS=-Wall -O0 -c -g3
 
 OS=$(shell uname -s)
 ifeq ($(OS),Darwin)
-	CFLAGS_AUX= `pkg-config --cflags libxml-2.0` \
-          `pkg-config --cflags libpcre` \
-          -I ./xml_support/ \
-          -I ../../aux-packages/tcl8.5.9/generic/ \
-          -I ../../aux-packages/build/include/ \
+	CFLAGS_AUX= -I ../../../../../aux-packages/build/include/ \
+          -I ../ \
           -DMACOSX -DAUXPACKAGES
     install_targets=install.macos
     PROTOC_PATH=$(shell pwd)/../../aux-packages/build/bin/
     
-    LDFLAGS=-ltcl8.5 \
-        -lpthread \
+    LDFLAGS=-lpthread \
         -ldl \
-        -L ./xml_support/obj/ -lxmlsup  \
-        -L ../../aux-packages/build/lib/ -lprotobuf \
+        -lp2vera -L ../obj/ \
+        -L ../../../../../aux-packages/build/lib/ -lprotobuf \
         -rdynamic
 else
 ifeq ($(AUXBUILD),AUX)
@@ -67,9 +63,9 @@ install.gnulinux: FORCE
 	@echo Done
 	
 install.macos: FORCE
-	@install_name_tool -change ./obj/libxmlsup.dylib  @executable_path/libs/libxmlsup.dylib $(BUILD_DIR)/$(PROG)
-	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libs/libprotobuf.7.dylib $(BUILD_DIR)/$(PROG)
-	@cp $(BUILD_DIR)/$(PROG) ../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(PROG)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(PROG)
+	@cp $(BUILD_DIR)/$(PROG) ../../bin/
 	@echo Done
 
 dirs: FORCE

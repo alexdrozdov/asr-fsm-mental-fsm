@@ -1,4 +1,4 @@
-#Tue May 08 21:55:18 MSD 2012
+#Thu Jun 14 14:38:33 MSD 2012
 eclipse.preferences.version=1
 environment/project/cdt.managedbuild.toolchain.gnu.base.1237948282/PATH/delimiter=\:
 environment/project/cdt.managedbuild.toolchain.gnu.base.1237948282/PATH/operation=replace
@@ -15,3 +15,8 @@ environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1936965919/PATH/o
 environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1936965919/PATH/value=${PATH}\:/usr/local/bin/
 environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1936965919/append=true
 environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1936965919/appendContributed=true
+environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1957358011/PATH/delimiter=\:
+environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1957358011/PATH/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1957358011/PATH/value=${PATH}\:/usr/local/bin/
+environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1957358011/append=true
+environment/project/cdt.managedbuild.toolchain.gnu.macosx.base.1957358011/appendContributed=true
