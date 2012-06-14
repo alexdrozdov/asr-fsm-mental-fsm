@@ -1,0 +1,63 @@
+
+package fann_train_cfg;
+
+option java_package = "fann_train_cfg";
+option java_outer_classname = "FannTrainCfg";
+
+
+message FannTrainProject {
+	required string name = 1;
+	optional string file_name = 2;
+	optional string description = 3;
+	
+	message FannOptions {
+		required int32 num_input = 1;
+		required int32 num_output = 2;
+		required int32 num_layers = 3;
+		required int32 num_neurons_hidden = 4;
+		required double desired_error = 5;
+		required int32 max_epochs = 6;
+		required int32 epochs_between_reports = 7;
+		
+		required bool b_i = 8;
+		required bool b_o = 9;
+		required bool b_h = 10;
+		required bool b_l = 11;
+		required bool b_t = 12;
+		required bool b_n = 13;
+		
+		optional string fann_file_name = 14;
+		optional bool fann_trained = 15;
+	}
+	
+	required FannOptions fann_opts = 4;
+	
+	message TrainIo {
+		enum IoType {
+			IOT_VALUE = 0;
+			IOT_FILE = 1;
+			IOT_VECTOR = 2;
+		}
+		
+		message FValues {
+			repeated double values = 1;
+		}
+	
+		required IoType type = 1;
+		optional string file_name = 2;
+		optional double value = 3;
+		
+		repeated double values = 4;
+		repeated FValues fvalues = 5;
+		optional string extract_regex = 6;
+	}
+	
+	message TrainEntry {
+		required string name = 1;
+		required TrainIo input = 2;
+		required TrainIo output = 3;
+	}
+
+	repeated TrainEntry entries = 5;
+}
+

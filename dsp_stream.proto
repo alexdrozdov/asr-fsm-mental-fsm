@@ -1,0 +1,39 @@
+package dsp;
+
+//Сообщение о текущем времени
+message time_message {
+	required int64 current_time = 1;
+}
+
+//Сообщение о частоте дискретизации в ЦОС
+message samplerate_message {
+	required int32 samplerate = 1;
+}
+
+//Спецификация состояния выхода триггера
+message trigger_output {
+	required int32 out_id = 1; //Номер выхода
+	required double value = 2; //Новое значение на выходе
+}
+
+//Спецификация изменившегося триггера
+message modified_triger {
+	required int32 id               = 1; //Идентификатор триггера
+	repeated trigger_output outputs = 2; //Список изменившихся выходов триггера
+}
+
+//Список изменившихся триггеров. Передается на сервер
+message modified_triggers {
+	repeated modified_triger items = 1; //Список изменившихся триггеров
+}
+
+message dsp_package {
+	repeated time_message time_inst                   = 2;
+	repeated samplerate_message samplerate_inst       = 3;
+	repeated modified_triggers modified_triggers_inst = 4;
+}
+
+
+
+
+
