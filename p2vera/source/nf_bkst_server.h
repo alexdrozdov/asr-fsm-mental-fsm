@@ -14,6 +14,7 @@
 class BkstNfServer : public IRemoteNfServer {
 public:
 	BkstNfServer(int id, net_find_config* rnfc);
+	virtual ~BkstNfServer();
 	virtual bool is_alive();      //Бессмысленная функция, т.к. не относится к конкретной машине. Возвращает true
 	virtual void forbide_usage(); //Запрещает рассылку вещательных запросов
 	virtual void enable_usage();  //Разрешает рассылку вещательных запросов
@@ -31,6 +32,10 @@ public:
 	virtual bool is_broadcast();
 	virtual bool is_localhost();
 	virtual void print_info();
+
+	virtual bool increase_ref_count(); //Увеличивает счетчик ссылок на экземпляр класса
+	virtual int  decrease_ref_count(); //Уменьшает счетчик ссылок на экземпляр класса
+	virtual bool is_referenced();      //Позволяет проверить наличие ссылок на экземпляр и возможность его удаления
 private:
 	bool enabled;
 	pthread_mutex_t mtx;
@@ -41,6 +46,7 @@ private:
 	sockaddr_in remote_addr;
 
 	timeval tv_request;
+	int ref_count;
 };
 
 #endif /* NF_BKST_SERVER_H_ */

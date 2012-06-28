@@ -15,6 +15,10 @@
 #include <string>
 #include <list>
 
+class INetFind;
+class IRemoteNfServer;
+class RemoteSrvUnit;
+
 //Конфигурация модуля поиска приложений в сети
 typedef struct _net_find_config {
 	std::string nf_name;    // Кодовое название этой части приложения
@@ -30,6 +34,7 @@ typedef struct _net_find_config {
 
 class IRemoteNfServer {
 public:
+	virtual ~IRemoteNfServer() = 0;
 	virtual bool is_alive() = 0;      //Проверить возможность установки связи с этим приложением.
 						              //Не гарантирует жизнеспособность приложения в текущий момент,
 						              //опирается на наличие ответов в недавнем прошлом.
@@ -56,6 +61,35 @@ public:
 	virtual bool is_broadcast() = 0; // Сервер на самом деле не существует, а используется для хранения информации о вещательных запросах
 	virtual bool is_localhost() = 0; // Сервер рабоает на тойже машине, что и эта копия библиотеки
 	virtual void print_info() = 0;   // Вывести параметры сервера в консоль
+
+	virtual bool increase_ref_count() = 0; //Увеличивает счетчик ссылок на экземпляр класса
+	virtual int decrease_ref_count() = 0; //Уменьшает счетчик ссылок на экземпляр класса
+	virtual bool is_referenced() = 0;      //Позволяет проверить наличие ссылок на экземпляр и возможность его удаления
+};
+
+//Инетерфейс, предоставляющий доступ к удаленному серверу. Клиенты должны использовать в
+//своих задачах именно этот класс, т.к. он обеспечивает подсчет ссылок на интерфейс
+//IRemoteNfServer. Назначение класса - сборка мусора и удаление серверов, ставших недоступными
+//по мере прекращения их использования
+class RemoteSrvUnit {
+public:
+	RemoteSrvUnit(const RemoteSrvUnit& original);
+	RemoteSrvUnit(IRemoteNfServer* itm);
+	RemoteSrvUnit& operator=(IRemoteNfServer* original);
+	virtual ~RemoteSrvUnit();
+	virtual bool is_alive();
+	virtual bool is_broadcast();
+	virtual bool is_localhost();
+	virtual std::string get_uniq_id();
+	virtual std::string get_name();
+	virtual std::string get_caption();
+	virtual sockaddr_in& get_remote_sockaddr();
+
+	RemoteSrvUnit& operator=(RemoteSrvUnit& original);
+	friend class INetFind;
+private:
+	IRemoteNfServer* irnfs;
+protected:
 };
 
 class INetFind {
@@ -69,6 +103,9 @@ public:
 	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id) = 0; //Поиск сервера по его уникальному идентификатору
 
 	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list) = 0; //Заполняет список действующих серверов.
+	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list) = 0;
+	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa) = 0;
+	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id) = 0;
 
 	virtual void print_servers() = 0;
 

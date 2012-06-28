@@ -6,6 +6,7 @@
  */
 
 #include <iostream>
+#include <list>
 
 #include <unistd.h>
 #include "p2vera.h"
@@ -24,12 +25,18 @@ int main(int argc, char *argv[]) {
 	nfc.nf_cluster = "netfind-test-cluster";
 	INetFind* nf = net_find_create(&nfc);
 	nf->add_scanable_server("127.0.0.1", "7300");
-	nf->add_broadcast_servers("7300");
+	//nf->add_broadcast_servers("7300");
 	while(true) {
-		usleep(10000000);
+		usleep(1000);
 		cout << endl;
 		cout << "Действующие сервера..." << endl;
-		nf->print_servers();
+		//nf->print_servers();
+		list<RemoteSrvUnit> rsl;
+		nf->get_alive_servers(rsl);
+		for (list<RemoteSrvUnit>::iterator it=rsl.begin();it!=rsl.end();it++) {
+			cout << it->get_uniq_id() << endl;
+		}
+		cout << endl;
 	}
 	return 0;
 }

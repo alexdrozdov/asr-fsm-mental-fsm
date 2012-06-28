@@ -27,6 +27,13 @@ BkstNfServer::BkstNfServer(int id, net_find_config* rnfc) {
 	remote_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
 	min_ping_time_delta = MIN_BKST_PING_DELTA;
+
+	pthread_mutex_init (&mtx, NULL);
+	ref_count = 1;
+}
+
+BkstNfServer::~BkstNfServer() {
+	pthread_mutex_destroy(&mtx);
 }
 
 bool BkstNfServer::is_alive() {
@@ -99,6 +106,27 @@ bool BkstNfServer::is_localhost() {
 void BkstNfServer::print_info() {
 	cout << "server type: broadcast" << endl;
 	cout << "address: " << inet_ntoa(remote_addr.sin_addr) << ":" << htons(remote_addr.sin_port) << endl;
+}
+
+bool BkstNfServer::increase_ref_count() {
+	pthread_mutex_lock(&mtx);
+	bool succed = (ref_count > 0);
+	if (ref_count>0) ref_count++;
+	pthread_mutex_unlock(&mtx);
+	return succed;
+}
+
+int BkstNfServer::decrease_ref_count() {
+	int tmp = 0;
+	pthread_mutex_lock(&mtx);
+	ref_count--;
+	tmp = ref_count;
+	pthread_mutex_unlock(&mtx);
+	return tmp;
+}
+
+bool BkstNfServer::is_referenced() {
+	return (ref_count>0);
 }
 
 

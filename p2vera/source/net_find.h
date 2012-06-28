@@ -64,6 +64,9 @@ public:
 	virtual void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
 	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list);
+	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list);
+	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa);
+	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id);
 
 	virtual std::string get_uniq_id();
 	virtual std::string get_name();

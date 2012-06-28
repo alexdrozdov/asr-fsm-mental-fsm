@@ -569,6 +569,7 @@ void NetFindListHandler::server_chanded() {
 }
 
 bool NetFindListHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* remote_addr) {
+	cout << "NetFindListHandler::handle_request info - launched" << endl;
 	msg_srvlist_rq mslr;
 	if (!mslr.ParseFromString(wrpr->body())) {
 		cout << "NetFindListHandler::handle_request error - failed to parse message" << endl;
@@ -580,26 +581,26 @@ bool NetFindListHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 		list_non_localhost = true;
 	}
 
-	list<IRemoteNfServer*> srv_list;
-	list<IRemoteNfServer*>::iterator it;
+	list<RemoteSrvUnit> srv_list;
+	list<RemoteSrvUnit>::iterator it;
 	nf->get_alive_servers(srv_list);
 	msg_srvlist_rsp mslrs;
 	for (it=srv_list.begin();it!=srv_list.end();it++) {
-		IRemoteNfServer* irnfs = *it;
-		if (irnfs->is_broadcast()) continue;  //Вещательные сервера не отправляются, т.к. не могут быть действующими по определению
-		if (!irnfs->is_localhost() && !list_non_localhost) continue; //По умолчанию отправляются только адреса локальных машин.
+		RemoteSrvUnit& rsu = *it;
+		if (rsu.is_broadcast()) continue;  //Вещательные сервера не отправляются, т.к. не могут быть действующими по определению
+		if (!rsu.is_localhost() && !list_non_localhost) continue; //По умолчанию отправляются только адреса локальных машин.
 		                                                             //адреса всех остальных машин отправляются только по специальному запросу
 
 		msg_srvlist_rsp_srv_addr* addr = mslrs.add_srv_addrs();
 		ostringstream ostr;
-		sockaddr_in sa = irnfs->get_remote_sockaddr();
+		sockaddr_in sa = rsu.get_remote_sockaddr();
 		ostr << htons(sa.sin_port);
 		addr->set_port(ostr.str());
 		ostr.str("");
 		unsigned int ip_addr = htonl(sa.sin_addr.s_addr);
 		ostr << ((ip_addr&0xFF000000)>>24) << "." << ((ip_addr&0x00FF0000)>>16) << "." << ((ip_addr&0x0000FF00)>>8) << "." << (ip_addr&0x000000FF);
 		addr->set_addr(ostr.str());
-		addr->set_uniq_id(irnfs->get_uniq_id());
+		addr->set_uniq_id(rsu.get_uniq_id());
 	}
 
 

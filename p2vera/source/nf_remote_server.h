@@ -15,6 +15,7 @@ class RemoteNfServer : public IRemoteNfServer {
 public:
 	RemoteNfServer(int id, net_find_config* rnfc);
 	RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr);
+	virtual ~RemoteNfServer();
 	virtual bool is_alive();      //Проверить возможность установки связи с этим приложением.
 	                      //Не гарантирует жизнеспособность приложения в текущий момент,
 	                      //опирается на наличие ответов в недавнем прошлом.
@@ -48,8 +49,9 @@ public:
 	virtual void is_localhost(bool b);
 	virtual void print_info();
 
-	//friend class NetFind;
-	//friend class NetFindLinkHandler;
+	virtual bool increase_ref_count(); //Увеличивает счетчик ссылок на экземпляр класса
+	virtual int decrease_ref_count();  //Уменьшает счетчик ссылок на экземпляр класса
+	virtual bool is_referenced();      //Позволяет проверить наличие ссылок на экземпляр и возможность его удаления
 private:
 	int failure_count;
 	bool enabled;
@@ -71,6 +73,8 @@ private:
 	std::vector<sockaddr_in> alternate_addrs;
 
 	timeval tv_request;
+
+	int ref_count;
 };
 
 #endif /* NF_REMOTE_SERVER_H_ */
