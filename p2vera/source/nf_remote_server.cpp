@@ -76,7 +76,6 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 }
 
 RemoteNfServer::~RemoteNfServer() {
-	cout << "RemoteNfServer::~RemoteNfServer info - destroying object" << endl;
 	pthread_mutex_destroy(&mtx);
 }
 
@@ -264,7 +263,6 @@ bool RemoteNfServer::increase_ref_count() {
 	pthread_mutex_lock(&mtx);
 	bool succed = (ref_count > 0);
 	if (ref_count > 0) ref_count++;
-	cout << "RemoteNfServer::increase_ref_count info - ref count for " << uniq_id << " is " << ref_count << endl;
 	pthread_mutex_unlock(&mtx);
 	return succed;
 }
@@ -274,7 +272,6 @@ int RemoteNfServer::decrease_ref_count() {
 	pthread_mutex_lock(&mtx);
 	ref_count--;
 	tmp = ref_count;
-	cout << "RemoteNfServer::decrease_ref_count info - ref count for " << uniq_id << " is " << ref_count << endl;
 	pthread_mutex_unlock(&mtx);
 	return tmp;
 }

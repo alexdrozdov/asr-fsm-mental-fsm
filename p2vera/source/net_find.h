@@ -58,12 +58,9 @@ public:
 	virtual int add_broadcast_servers(std::string port); //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
 	virtual int add_discovered_server(sockaddr_in& addr, std::string uniq_id);
 
-	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa);     //Поиск сервера по его обратному адресу
-	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id); //Поиск сервера по его уникальному идентификатору
 	virtual void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
 	virtual void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
-	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list);
 	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list);
 	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa);
 	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id);

@@ -125,12 +125,17 @@ int NetFind::generate_remote_id() {
 }
 
 int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
-	if (NULL != by_uniq_id(uniq_id)) {
-		return -1;
-	}
 	bool b_localhost = is_localhost(addr);
 	if (b_localhost &&  htons(addr.sin_port)==get_server_port()) {
 		return -1; //Это локальный сервер. Как он оказался среди всего этого непонятно, но добавлять его не стоит
+	}
+	int remote_id = generate_remote_id();
+
+	pthread_mutex_lock(&mtx);
+	map<std::string, IRemoteNfServer*>::iterator it = m_str_servers.find(uniq_id);
+	if (it != m_str_servers.end()) {
+		pthread_mutex_unlock(&mtx);
+		return -1;
 	}
 
 	net_find_config nfc;
@@ -140,7 +145,6 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 	nfc.scanable = true;
 	nfc.usage = 0;
 
-	int remote_id = generate_remote_id();
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc, addr);
 	if (b_localhost) { //Для серверов, работающих на локальной машине добавляем все адреса, с которых могут приходить ответы
 		rnfs->is_localhost(true);
@@ -150,13 +154,12 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 		}
 	}
 
-	pthread_mutex_lock(&mtx);
 	remote_servers.push_back(rnfs);
 	m_str_servers[uniq_id] = rnfs;
 	reg_to_sockaddr(addr, rnfs);
 	pthread_mutex_unlock(&mtx);
 
-	if (rnfs->requires_info_request()) {
+	if (rnfs->requires_info_request()) { //FIXME Возможны гонки при добавлении серверов из нескольких потоков
 		info_list.push_back(rnfs);
 	}
 
@@ -196,32 +199,6 @@ int NetFind::add_broadcast_servers(std::string port) {
 	return 0;
 }
 
-//Поиск сервера по его обратному адресу
-IRemoteNfServer* NetFind::by_sockaddr(sockaddr_in& sa) {
-	pthread_mutex_lock(&mtx);
-	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
-	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
-	if (it == m_sa_servers.end()) {
-		pthread_mutex_unlock(&mtx);
-		return NULL;
-	}
-
-	pthread_mutex_unlock(&mtx);
-	return it->second;
-}
-
-//Поиск сервера по его уникальному идентификатору
-IRemoteNfServer* NetFind::by_uniq_id(std::string uniq_id) {
-	pthread_mutex_lock(&mtx);
-	map<std::string, IRemoteNfServer*>::iterator it = m_str_servers.find(uniq_id);
-	if (it == m_str_servers.end()) {
-		pthread_mutex_unlock(&mtx);
-		return NULL;
-	}
-	pthread_mutex_unlock(&mtx);
-	return it->second;
-}
-
 void NetFind::reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* irnfs) {
 	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
 	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
@@ -254,32 +231,15 @@ void NetFind::print_servers() {
 	pthread_mutex_unlock(&mtx);
 }
 
-void NetFind::get_alive_servers(std::list<IRemoteNfServer*>& srv_list) {
-	srv_list.clear();
-	pthread_mutex_lock(&mtx);
-	list<IRemoteNfServer*>::iterator it;
-	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
-		IRemoteNfServer* irnfs = *it;
-		if (NULL == irnfs) continue;
-		srv_list.push_back(irnfs);
-	}
-	pthread_mutex_unlock(&mtx);
-}
-
 void NetFind::get_alive_servers(std::list<RemoteSrvUnit>& srv_list) {
-	cout << "NetFind::get_alive_servers info - launched" << endl;
 	srv_list.clear();
 	pthread_mutex_lock(&mtx);
 	list<IRemoteNfServer*>::iterator it;
 	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
 		IRemoteNfServer* irnfs = *it;
-		if (NULL == irnfs) continue;
-
-		cout <<  "NetFind::get_alive_servers info - creating" << endl;
+		if (NULL == irnfs || irnfs->is_broadcast()) continue;
 		RemoteSrvUnit rs(irnfs);
-		cout <<  "NetFind::get_alive_servers info - pushing to list" << endl;
 		srv_list.push_back(rs);
-		cout <<  "NetFind::get_alive_servers info - end of loop iteration" << endl;
 	}
 	pthread_mutex_unlock(&mtx);
 }
@@ -288,9 +248,9 @@ RemoteSrvUnit NetFind::get_by_sockaddr(sockaddr_in& sa) {
 	pthread_mutex_lock(&mtx);
 	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
 	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
-	if (it == m_sa_servers.end()) {
+	if (it == m_sa_servers.end() || NULL==it->second) {
 		pthread_mutex_unlock(&mtx);
-		throw;
+		throw server_not_found();
 	}
 	IRemoteNfServer* irnfs = it->second;
 	RemoteSrvUnit rs(irnfs);
@@ -301,9 +261,9 @@ RemoteSrvUnit NetFind::get_by_sockaddr(sockaddr_in& sa) {
 RemoteSrvUnit NetFind::get_by_uniq_id(std::string uniq_id) {
 	pthread_mutex_lock(&mtx);
 	map<std::string, IRemoteNfServer*>::iterator it = m_str_servers.find(uniq_id);
-	if (it == m_str_servers.end()) {
+	if (it == m_str_servers.end() || NULL==it->second) {
 		pthread_mutex_unlock(&mtx);
-		throw;
+		throw server_not_found();
 	}
 	IRemoteNfServer* irnfs = it->second;
 	RemoteSrvUnit rs(irnfs);
@@ -481,8 +441,16 @@ void NetFind::unlink_server(IRemoteNfServer* irnfs) {
 	if (it_uid != m_str_servers.end()) {
 		m_str_servers.erase(it_uid);
 	}
+
+	//По возможности удаляем этот сервер из списка хостов. Только в том случае, если он не он не изменился
+	sockaddr_in& sa = irnfs->get_remote_sockaddr();
+	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	map<unsigned long long, IRemoteNfServer*>::iterator it_sa = m_sa_servers.find(lsa);
+	if (it_sa!=m_sa_servers.end() && irnfs==it_sa->second) {
+		m_sa_servers.erase(it_sa);
+	}
+
 	if (0 == irnfs->decrease_ref_count()) {
-		cout << "NetFind::unlink_server - freeing memory" << endl;
 		delete irnfs;
 	}
 }

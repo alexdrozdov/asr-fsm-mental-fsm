@@ -19,6 +19,11 @@ class INetFind;
 class IRemoteNfServer;
 class RemoteSrvUnit;
 
+class server_not_found {
+public:
+	server_not_found() {};
+};
+
 //Конфигурация модуля поиска приложений в сети
 typedef struct _net_find_config {
 	std::string nf_name;    // Кодовое название этой части приложения
@@ -84,6 +89,7 @@ public:
 	virtual std::string get_name();
 	virtual std::string get_caption();
 	virtual sockaddr_in& get_remote_sockaddr();
+	virtual IRemoteNfServer* irnfs_ptr();
 
 	RemoteSrvUnit& operator=(RemoteSrvUnit& original);
 	friend class INetFind;
@@ -99,11 +105,7 @@ public:
 	virtual int add_scanable_server(std::string address, std::string port) = 0;
 	virtual int add_broadcast_servers(std::string port) = 0; //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
 
-	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa) = 0;     //Поиск сервера по его обратному адресу
-	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id) = 0; //Поиск сервера по его уникальному идентификатору
-
-	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list) = 0; //Заполняет список действующих серверов.
-	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list) = 0;
+	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list) = 0; //Заполняет список действующих серверов.
 	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa) = 0;
 	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id) = 0;
 

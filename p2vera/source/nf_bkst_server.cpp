@@ -54,7 +54,7 @@ int BkstNfServer::get_id() {
 }
 
 string BkstNfServer::get_uniq_id() {
-	return 0;
+	return "";
 }
 
 sockaddr_in&  BkstNfServer::get_remote_sockaddr() {

@@ -65,6 +65,10 @@ sockaddr_in& RemoteSrvUnit::get_remote_sockaddr() {
 	return irnfs->get_remote_sockaddr();
 }
 
+IRemoteNfServer* RemoteSrvUnit::irnfs_ptr() {
+	return irnfs;
+}
+
 RemoteSrvUnit& RemoteSrvUnit::operator=(RemoteSrvUnit& original) {
 	irnfs = original.irnfs;
 	irnfs->increase_ref_count();

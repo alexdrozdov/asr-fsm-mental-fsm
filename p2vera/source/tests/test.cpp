@@ -5,6 +5,8 @@
  *      Author: drozdov
  */
 
+#include <stdlib.h>
+
 #include <iostream>
 #include <list>
 
@@ -25,9 +27,9 @@ int main(int argc, char *argv[]) {
 	nfc.nf_cluster = "netfind-test-cluster";
 	INetFind* nf = net_find_create(&nfc);
 	nf->add_scanable_server("127.0.0.1", "7300");
-	//nf->add_broadcast_servers("7300");
+	nf->add_broadcast_servers("7300");
 	while(true) {
-		usleep(1000);
+		usleep(1000000);
 		cout << endl;
 		cout << "Действующие сервера..." << endl;
 		//nf->print_servers();
