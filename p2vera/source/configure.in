@@ -1,0 +1,93 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.67])
+AC_INIT([p2vera], [0.1], [alex.drozdovs@gmail.com])
+AC_CONFIG_SRCDIR([net_find_handlers.h])
+
+# Checks for programs.
+AC_PROG_CXX
+AC_PROG_CC
+SC_ENABLE_THREADS
+SC_ENABLE_SHARED
+
+AC_CHECK_HEADERS([arpa/inet.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_HEADER_STDBOOL
+
+# Checks for library functions.
+AC_CHECK_FUNCS([gethostname gettimeofday inet_ntoa memset socket])
+
+AC_CHECK_LIB([ssl], [main])
+AC_CHECK_LIB([crypto], [main])
+AC_CHECK_LIB([dl], [main])
+AC_CHECK_LIB([pthread], [main])
+
+AC_MSG_CHECKING([if building for macosx])
+if test "`uname -s`" = "Darwin" ; then
+	AC_MSG_RESULT([yes])
+    libext=.dylib
+    install_targets=install.macos
+    is_darwin="0"
+else
+	AC_MSG_RESULT([no])
+	libext=.so
+	install_targets=install.gnulinux
+	is_darwin="1"
+fi
+
+
+DIR_AUX=`pwd`/../../../../aux-packages
+DIR_AUX=`realpath $DIR_AUX`
+DIR_PROTOBUF_INC_DEFAULT=$DIR_AUX/build/include/
+DIR_PROTOBUF_LIB_DEFAULT=$DIR_AUX/build/lib/
+DIR_PROTOBUF_BIN_DEFAULT=$DIR_AUX/build/bin/
+
+AC_MSG_CHECKING([usable instance for protocol buffers (option --with-aux-protobuf)])
+AC_ARG_WITH(aux-protobuf, [Use local copy for Google Protocol Buffers. By default are used standart libraries, this option allowes to link with libraries in package aux. Can be used in systems, where protocol buffers are not installed],\
+                          [use_aux_protobuf="0"], \
+                          [use_aux_protobuf="1"])
+                          
+if test "$use_aux_protobuf" = "0" || test "$is_darwin" = "0" ; then
+	AC_MSG_RESULT([local])
+	export LD_LIBRARY_PATH=$DIR_PROTOBUF_LIB_DEFAULT
+	AC_CHECK_LIB([protobuf], [main], [libprotobuf_found="yes"], [libprotobuf_found="no"])
+	if test "$libprotobuf_found" = "no" ; then
+		AC_MSG_ERROR([Google Protocol Buffers libraries not found])
+	fi
+	AC_CHECK_PROG(protoc_found, protoc, yes, no, $DIR_PROTOBUF_BIN_DEFAULT)
+	if test "$protoc_found" = "no" ; then
+		AC_MSG_ERROR([Google Protocol Buffers compiler not found on PATH])
+	fi
+	LIBS="$LIBS -lprotobuf -L$DIR_PROTOBUF_LIB_DEFAULT"
+	includes="$INCLUDES -I $DIR_PROTOBUF_INC_DEFAULT"
+	protoc="${DIR_PROTOBUF_BIN_DEFAULT}protoc"
+else
+	AC_MSG_RESULT([system-wide])
+	AC_CHECK_LIB([protobuf], [main], [libprotobuf_found="yes"], [libprotobuf_found="no"])
+	if test "$libprotobuf_found" = "no" ; then
+		AC_MSG_ERROR([Google Protocol Buffers libraries not found])
+	fi
+	AC_CHECK_PROG(protoc_found, protoc, yes, no)
+	if test "$protoc_found" = "no" ; then
+		AC_MSG_ERROR([Google Protocol Buffers compiler not found on PATH])
+	fi
+	LIBS="$LIBS -lprotobuf"
+	includes=""
+	protoc="protoc"
+fi
+
+build_dir="./obj"
+CFLAGS="-Wall -O0 -g3"
+
+AC_SUBST(libext)
+AC_SUBST(install_targets)
+AC_SUBST(protoc)
+AC_SUBST(includes)
+AC_SUBST(build_dir)
+
+
+AC_CONFIG_FILES([Makefile
+                 tests/Makefile])
+AC_OUTPUT

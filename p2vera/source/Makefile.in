@@ -1,13 +1,13 @@
 
-CCP=g++
-CCC=gcc
-PROTOC=protoc
+CCP=@CXX@
+CCC=@CC@
+PROTOC=@protoc@
 
-PROG=libp2vera.so
-BUILD_DIR=./obj
+PROG=libp2vera@libext@
+BUILD_DIR=@build_dir@
 
-CFLAGS=-Wall -O0 -g3  -c 
-LDFLAGS=-shared -lpthread -ldl -lcrypto -lssl  -lprotobuf
+CFLAGS=@CFLAGS@ @includes@ -c 
+LDFLAGS=-shared @LIBS@
 
 SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
@@ -16,7 +16,7 @@ PROTO=$(wildcard *.proto)
 PROTO_CC=$(PROTO:%.proto=%.pb.cc)
 PROTO_OBJ=$(PROTO_CC:%.cc=./obj/%.o)
 
-all:$(BUILD_DIR)/$(PROG) install.gnulinux netfindtest
+all:$(BUILD_DIR)/$(PROG) @install_targets@ netfindtest
 
 $(BUILD_DIR)/$(PROG): dirs $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 	@echo [LD] $(PROG); \
