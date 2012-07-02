@@ -1,4 +1,3 @@
-
 CCP=@CXX@
 CCC=@CC@
 PROTOC=@protoc@
@@ -53,6 +52,7 @@ netfindtest : FORCE
 	@$(MAKE) -C ./tests/
 
 clean:
-	rm -rf $(BUILD_DIR) *.pb.cc *.pb.h	
+	rm -rf $(BUILD_DIR) *.pb.cc *.pb.h
+	@$(MAKE) clean -C ./tests/
 	
 FORCE:
