@@ -5,3 +5,11 @@
  *      Author: drozdov
  */
 
+
+#include "p2stream.h"
+
+IP2VeraMessage::~IP2VeraMessage() {
+}
+
+IP2VeraStream::~IP2VeraStream() {
+}

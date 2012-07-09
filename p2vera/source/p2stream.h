@@ -9,6 +9,7 @@
 #define P2STREAM_H_
 
 #include <string>
+#include <vector>
 
 enum stream_direction {
 	stream_direction_income   = 0,
@@ -19,7 +20,7 @@ enum stream_direction {
 
 class IP2VeraMessage {
 public:
-	virtual ~IP2VeraMessage()
+	virtual ~IP2VeraMessage() = 0;
 	virtual bool get_data(std::string& str) = 0;
 	virtual int get_data(void* data, int max_data_size) = 0;
 	virtual int get_data_size() = 0;
@@ -27,8 +28,6 @@ public:
 
 class IP2VeraStream {
 public:
-	//IP2VeraStream(const IP2VeraStream& p2s);
-	//IP2VeraStream(std::string stream_name);
 	virtual ~IP2VeraStream() = 0;
 	virtual IP2VeraStream& operator<<(IP2VeraMessage& p2m) = 0;
 	virtual IP2VeraStream& operator>>(IP2VeraMessage& p2m) = 0;
@@ -50,8 +49,9 @@ enum stream_type {
 };
 
 enum stream_msg_order {
-	stream_msg_order_any = 0,
-	stream_msg_order_
+	stream_msg_order_any = 0,    //Требования к порядку доставки сообщений не предъявляются
+	stream_msg_order_chrono = 1, //Сообщения должны доставляться в хронологическом порядке, но могут пропадать
+	stream_msg_order_strict = 2  //Сообщения должны доставляться полностью и в строго хронологическом порядке
 };
 
 class P2VeraStreamHub {
@@ -59,7 +59,6 @@ public:
 private:
 	std::string stream_name;
 	bool is_opened();
-
 };
 
 

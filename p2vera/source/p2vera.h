@@ -12,6 +12,7 @@
 
 #include "inet_find.h"
 
+#define MD5_DIGEST_LENGTH 16
 
 class P2Vera {
 public:
