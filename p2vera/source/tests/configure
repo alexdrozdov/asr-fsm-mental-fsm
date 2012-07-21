@@ -557,7 +557,7 @@ PACKAGE_STRING='p2vera-tests 0.1'
 PACKAGE_BUGREPORT='alex.drozdovs@gmail.com'
 PACKAGE_URL=''
 
-ac_unique_file="test.cpp"
+ac_unique_file="test_netfind.cpp"
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>

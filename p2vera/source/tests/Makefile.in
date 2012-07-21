@@ -2,7 +2,8 @@ CCP=@CXX@
 CCC=@CC@
 
 
-PROG=_tst_net_find.bin
+trg_netfind=_tst_net_find.bin
+trg_hub=_tst_hub.bin
 BUILD_DIR=@build_dir@
 
 CFLAGS=@CFLAGS@ @includes@ -c 
@@ -11,20 +12,28 @@ LDFLAGS=-rdynamic @LIBS@
 SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-all:$(BUILD_DIR)/$(PROG) @install_targets@
+all:$(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) @install_targets@
 
-$(BUILD_DIR)/$(PROG): dirs $(OBJS)
-	@echo [LD] $(PROG); \
-	$(CCP) $(OBJS) $(LDFLAGS) -o $(BUILD_DIR)/$(PROG)
+$(BUILD_DIR)/$(trg_netfind): dirs $(OBJS)
+	@echo [LD] $(trg_netfind); \
+	$(CCP) $(BUILD_DIR)/test_netfind.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_netfind)
+	
+$(BUILD_DIR)/$(trg_hub): dirs $(OBJS)
+	@echo [LD] $(trg_hub); \
+	$(CCP) $(BUILD_DIR)/test_hub.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_hub)
 
 install.gnulinux: FORCE
-	@cp $(BUILD_DIR)/$(PROG) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_hub) ../../bin/
 	@echo Done
 	
 install.macos: FORCE
-	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(PROG)
-	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(PROG)
-	@cp $(BUILD_DIR)/$(PROG) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_netfind)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_netfind)
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_hub)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_hub)
+	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_hub) ../../bin/
 	@echo Done
 
 dirs: FORCE

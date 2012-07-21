@@ -1,9 +1,13 @@
 /*
  * inet_find.h
  *
+ * Файл описывает интерфейсы компонента обнаружения программ, использующих
+ * p2vera в пределах одного сегмента ЛВС.
+ *
  *  Created on: 10.06.2012
  *      Author: drozdov
  */
+
 
 #ifndef INET_FIND_H_
 #define INET_FIND_H_
@@ -98,23 +102,24 @@ private:
 protected:
 };
 
+//Интерфейс класса, обнаруживающего и отслеживающего списки приложений в сети
 class INetFind {
 public:
 
-	virtual bool is_server() = 0; //Позволяет проверить текущий режим этой копии библиотеки
-	virtual int add_scanable_server(std::string address, std::string port) = 0;
-	virtual int add_broadcast_servers(std::string port) = 0; //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
+	virtual bool is_server() = 0;                                               //Позволяет проверить текущий режим этой копии библиотеки
+	virtual int add_scanable_server(std::string address, std::string port) = 0; //Добавить адрес сервера, на котором могут запускаться приложения. Сервер будет периодически опрашиваться классом
+	virtual int add_broadcast_servers(std::string port) = 0;                    //Автоматическое обнаружение серверов, отвечающих на вещательные запросы по указанному порту
 
-	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list) = 0; //Заполняет список действующих серверов.
-	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa) = 0;
-	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id) = 0;
+	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list) = 0;     //Заполняет список действующих серверов.
+	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa) = 0;                 //Поиск приложения, слушающего по указанному адресу (ip+порт)
+	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id) = 0;              //Поиск приложения по его уникальному идентификатору
 
-	virtual void print_servers() = 0;
+	virtual void print_servers() = 0;                                           //Вывод в консоль списка обнеруженных приложений
 
-	virtual std::string get_uniq_id() = 0;
-	virtual std::string get_name() = 0;
-	virtual std::string get_caption() = 0;
-	virtual std::string get_cluster() = 0;
+	virtual std::string get_uniq_id() = 0;                                      //Узнать уникальный идентификатор этого экземпляра класса
+	virtual std::string get_name() = 0;                                         //Узнать название
+	virtual std::string get_caption() = 0;                                      //Узнать название (отображаемое для пользователя)
+	virtual std::string get_cluster() = 0;                                      //Определить кластер приложений, в котором заерегистрировался экземляр класса
 };
 
 extern INetFind* net_find_create(net_find_config *nfc);

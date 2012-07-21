@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.67])
 AC_INIT([p2vera-tests], [0.1], [alex.drozdovs@gmail.com])
-AC_CONFIG_SRCDIR([test.cpp])
+AC_CONFIG_SRCDIR([test_netfind.cpp])
 
 # Checks for programs.
 AC_PROG_CXX
