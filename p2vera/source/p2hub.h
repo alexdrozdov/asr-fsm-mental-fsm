@@ -29,7 +29,7 @@ public:
 	virtual P2VeraStream create_outstream();               //Создает новый экземляр исходящего потока, подсоединенного к хабу.
 	virtual void unlink_stream(P2VeraStream p2s);          //Отсоединяет существующий экземпляр потока. После того, как последний клиент отсоединится от его очереди поток будет автоматически удален
 	virtual bool send_message(IP2VeraMessage& p2m);        //Отправляет сообщение в сеть и другим подсоединенным хабам при необходимости
-	virtual bool add_message_target(RemoteSrvUnit rsu);    //Добавляет удаленный сервер, который нуждается в получении сообщений от этого хаба
+	virtual bool add_message_target(RemoteSrvUnit rsu, int port);    //Добавляет удаленный сервер, который нуждается в получении сообщений от этого хаба
 	virtual bool remove_message_target(RemoteSrvUnit rsu); //Удаляет сервер. Хаб должен прекратить передачу сообщений этому серверу
 
 private:

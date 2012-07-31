@@ -31,6 +31,7 @@ public:
 	virtual bool requires_info_request();
 	virtual bool is_broadcast();
 	virtual bool is_localhost();
+	virtual bool is_self();
 	virtual void print_info();
 
 	virtual bool increase_ref_count(); //Увеличивает счетчик ссылок на экземпляр класса

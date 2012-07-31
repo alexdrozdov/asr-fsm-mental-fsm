@@ -47,6 +47,8 @@ public:
 	virtual bool is_broadcast();
 	virtual bool is_localhost();
 	virtual void is_localhost(bool b);
+	virtual bool is_self();
+	virtual void is_self(bool b);
 	virtual void print_info();
 
 	virtual bool increase_ref_count(); //Увеличивает счетчик ссылок на экземпляр класса
@@ -59,6 +61,7 @@ private:
 	                          //Добавлен порльзователем, поэтому не имеет уникального идентификатора
 	bool full_info_present;   //Вся информация о сервере получена и хранится в этом объекте. В противном случае ее необходимо получить
 	bool localhost;
+	bool is_local_program;
 	pthread_mutex_t mtx;
 	std::map<int, rmt_ping> pings_sent; //Список отправленных запросов, ожидающих ответа
 

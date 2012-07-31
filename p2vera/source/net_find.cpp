@@ -153,8 +153,30 @@ int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
 	}
 
 	sfc.sh = sh;
+	streams.push_back(sfc);
 	pthread_mutex_unlock(&mtx);
 	return sfc.sock_fd;
+}
+
+void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint& re) {
+	pthread_mutex_lock(&mtx);
+	list<stream_full_cfg>::iterator it = find_stream(stream_name);
+	if (streams.end() == it) { //Такой поток не зарегистрирован.
+		pthread_mutex_unlock(&mtx);
+		return;
+	}
+	stream_full_cfg& sfc = *it;
+
+	//Ищем, переданный endpoint среди ранее зарегистрированных
+	for (list<remote_endpoint>::iterator re_it=sfc.remote_endpoints.begin();re_it!=sfc.remote_endpoints.end();re_it++) {
+		if (re_it->rsu == re.rsu) { //Такой сервер уже обработан и зарегистрирован
+			pthread_mutex_unlock(&mtx);
+			return;
+		}
+	}
+	sfc.remote_endpoints.push_back(re);
+	sfc.sh->add_message_target(re.rsu, re.remote_port);
+	pthread_mutex_unlock(&mtx);
 }
 
 std::list<stream_full_cfg>::const_iterator NetFind::streams_begin() {
@@ -209,6 +231,9 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc, addr);
 	if (b_localhost) { //Для серверов, работающих на локальной машине добавляем все адреса, с которых могут приходить ответы
 		rnfs->is_localhost(true);
+		if (uniq_id == get_uniq_id()) {
+			rnfs->is_self(true);
+		}
 		vector<sockaddr_in>::iterator it;
 		for (it=local_ips.begin();it!=local_ips.end();it++) {
 			rnfs->add_alternate_addr(*it);

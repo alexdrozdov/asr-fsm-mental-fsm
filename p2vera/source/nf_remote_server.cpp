@@ -33,6 +33,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	failure_count = 0;
 	full_info_present = false;
 	localhost = false;
+	is_local_program = false;
 
 	memset(&remote_addr, 0 , sizeof(sockaddr_in));
 	remote_addr.sin_family = AF_INET;
@@ -64,6 +65,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 	is_addr_placeholder = false;
 	full_info_present = false;
 	localhost = false;
+	is_local_program = false;
 
 	memcpy(&remote_addr, &addr, sizeof(sockaddr_in));
 	alternate_addrs.push_back(addr);
@@ -240,6 +242,14 @@ bool RemoteNfServer::is_broadcast() {
 
 bool RemoteNfServer::is_localhost() {
 	return localhost;
+}
+
+bool RemoteNfServer::is_self() {
+	return is_local_program;
+}
+
+void RemoteNfServer::is_self(bool b) {
+	is_local_program = b;
 }
 
 void RemoteNfServer::is_localhost(bool b) {

@@ -92,7 +92,7 @@ public:
 	virtual bool is_localhost(sockaddr_in& sa); //Проверят, относится ли ip адрес к этому компьютеру
 
 	virtual int register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh);   //Зарегистрировать новый поток сообщений, по которому возможно взаимодействие
-
+	virtual void register_remote_endpoint(std::string stream_name, remote_endpoint& re);
 	virtual std::list<stream_full_cfg>::const_iterator streams_begin();
 	virtual std::list<stream_full_cfg>::const_iterator streams_end();
 

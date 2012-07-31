@@ -93,7 +93,8 @@ bool P2VeraStreamHub::send_message(IP2VeraMessage& p2m) {
 	return false;
 }
 
-bool P2VeraStreamHub::add_message_target(RemoteSrvUnit rsu) {
+bool P2VeraStreamHub::add_message_target(RemoteSrvUnit rsu, int port) {
+	cout << "P2VeraStreamHub::add_message_target info - launched for " << rsu.get_uniq_id() << " at port " << port << endl;
 	return false;
 }
 

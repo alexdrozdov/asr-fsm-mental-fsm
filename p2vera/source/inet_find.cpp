@@ -26,6 +26,10 @@ RemoteSrvUnit::RemoteSrvUnit(IRemoteNfServer* itm) {
 	}
 }
 
+RemoteSrvUnit::RemoteSrvUnit() {
+	irnfs = NULL;
+}
+
 RemoteSrvUnit::RemoteSrvUnit(const RemoteSrvUnit& original) {
 	irnfs = original.irnfs;
 	irnfs->increase_ref_count();
@@ -47,6 +51,10 @@ bool RemoteSrvUnit::is_broadcast() {
 
 bool RemoteSrvUnit::is_localhost() {
 	return irnfs->is_localhost();
+}
+
+bool RemoteSrvUnit::is_self() {
+	return irnfs->is_self();
 }
 
 std::string RemoteSrvUnit::get_uniq_id() {
@@ -80,6 +88,10 @@ RemoteSrvUnit& RemoteSrvUnit::operator=(IRemoteNfServer* original) {
 	irnfs = original;
 	irnfs->increase_ref_count();
 	return *this;
+}
+
+bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh) {
+	return (lh.irnfs == rh.irnfs);
 }
 
 

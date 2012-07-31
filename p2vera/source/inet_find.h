@@ -71,6 +71,7 @@ public:
 
 	virtual bool is_broadcast() = 0; // Сервер на самом деле не существует, а используется для хранения информации о вещательных запросах
 	virtual bool is_localhost() = 0; // Сервер рабоает на тойже машине, что и эта копия библиотеки
+	virtual bool is_self() = 0;      // Сервер запущен в этом экземпляре программы
 	virtual void print_info() = 0;   // Вывести параметры сервера в консоль
 
 	virtual bool increase_ref_count() = 0; //Увеличивает счетчик ссылок на экземпляр класса
@@ -84,13 +85,15 @@ public:
 //по мере прекращения их использования
 class RemoteSrvUnit {
 public:
+	RemoteSrvUnit();
 	RemoteSrvUnit(const RemoteSrvUnit& original);
 	RemoteSrvUnit(IRemoteNfServer* itm);
 	RemoteSrvUnit& operator=(IRemoteNfServer* original);
 	virtual ~RemoteSrvUnit();
-	virtual bool is_alive();
-	virtual bool is_broadcast();
-	virtual bool is_localhost();
+	virtual bool is_alive();     //Признак активности узла
+	virtual bool is_broadcast(); //Признак вещательного узла
+	virtual bool is_localhost(); //Признак узла, расположенного на локальной машине
+	virtual bool is_self();      //Признак узла, относящегося к этой программе
 	virtual std::string get_uniq_id();
 	virtual std::string get_name();
 	virtual std::string get_caption();
@@ -99,10 +102,13 @@ public:
 
 	RemoteSrvUnit& operator=(RemoteSrvUnit& original);
 	friend class INetFind;
+	friend bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
 private:
 	IRemoteNfServer* irnfs;
 protected:
 };
+
+extern bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
 
 //Интерфейс класса, обнаруживающего и отслеживающего списки приложений в сети
 class INetFind {

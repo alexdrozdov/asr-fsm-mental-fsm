@@ -351,8 +351,6 @@ bool NetFindInfoHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 		return false;
 	}
 
-	cout << "NetFindInfoHandler::handle_request info - launched" << endl;
-
 	msg_info_rsp mirs;
 	mirs.set_rq_cookie_id(mir.rq_cookie_id());
 	mirs.set_rp_cookie_id(nf->get_uniq_id());
@@ -362,7 +360,6 @@ bool NetFindInfoHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 
 	//Заполняем список каналов, поддерживаемых этим экземпляром библиотеки
 	for (list<stream_full_cfg>::const_iterator it=nf->streams_begin();it!=nf->streams_end();it++) {
-		cout << "NetFindInfoHandler::handle_request info - added channel" << endl;
 		p2v_channel *p2vc = mirs.add_channels();
 		p2vc->set_name(it->stream_cfg.name);
 		p2vc->set_port(it->port);
@@ -429,13 +426,14 @@ bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		return false;
 	}
 
-	cout << "NetFindInfoHandler::handle_response info - launched" << endl;
-
 	try {
 		RemoteSrvUnit rsu = nf->get_by_uniq_id(mirs.rp_cookie_id());
 		RemoteNfServer* rnfs = reinterpret_cast<RemoteNfServer*>(rsu.irnfs_ptr());
 		if (NULL == rnfs) { //Сервер с таким идентификатором не найден.
 			return false;
+		}
+		if (rnfs->is_self()) { //Пришел ответ от этого экземляра программы. Соединяться с ним нет смысла
+			return true;
 		}
 
 		net_find_config nfc;
@@ -457,7 +455,11 @@ bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		rnfs->update_info(&nfc);
 		for (int i=0;i<mirs.channels_size();i++) {
 			const p2v_channel& p2vc = mirs.channels(i);
-			cout << "Channel: " << p2vc.name() << "; port: " << p2vc.port() << endl;
+			remote_endpoint re;
+			re.remote_port = p2vc.port();
+			re.rsu = rsu;
+			nf->register_remote_endpoint(p2vc.name(), re);
+			//cout << "Channel: " << p2vc.name() << "; port: " << p2vc.port() << endl;
 		}
 	} catch (...) {
 		cout << "NetFindInfoHandler::handle_response error - unknown exception occured" << endl;

@@ -103,6 +103,10 @@ bool BkstNfServer::is_localhost() {
 	return false;
 }
 
+bool BkstNfServer::is_self() {
+	return false;
+}
+
 void BkstNfServer::print_info() {
 	cout << "server type: broadcast" << endl;
 	cout << "address: " << inet_ntoa(remote_addr.sin_addr) << ":" << htons(remote_addr.sin_port) << endl;
