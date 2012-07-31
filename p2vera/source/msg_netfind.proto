@@ -47,7 +47,14 @@ message p2v_channel {
 		tranceiver  = 2;
 	}
 	required endpoint_mode ep_mode = 3; //Тип конечной точки
-	optional string caption        = 4;
+	enum channel_integrity {
+		any      = 0;  //Не имеет значения
+		order    = 1;  //Соблюдать порядок
+		complete = 2;  //Соблюдать порядок и состав данных
+	}
+	required channel_integrity ch_integrity = 4; //Надежность доствки данных в канале
+	required int32 port            = 5;          //Номер порта, по которому необходимо устанавливать соединение
+	optional string caption        = 6;
 }
 
 message msg_info_rsp {

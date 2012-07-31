@@ -22,6 +22,8 @@
 class INetFind;
 class IRemoteNfServer;
 class RemoteSrvUnit;
+class IP2VeraStreamHub;
+struct _stream_config;
 
 class server_not_found {
 public:
@@ -120,6 +122,8 @@ public:
 	virtual std::string get_name() = 0;                                         //Узнать название
 	virtual std::string get_caption() = 0;                                      //Узнать название (отображаемое для пользователя)
 	virtual std::string get_cluster() = 0;                                      //Определить кластер приложений, в котором заерегистрировался экземляр класса
+
+	virtual int register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) = 0;         //Зарегистрировать новый поток сообщений, по которому возможно взаимодействие
 };
 
 extern INetFind* net_find_create(net_find_config *nfc);

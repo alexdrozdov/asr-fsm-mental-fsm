@@ -33,6 +33,14 @@ enum stream_msg_order {
 
 class IP2VeraStreamQq;
 class P2VeraBasicMessage;
+class IP2VeraStreamHub;
+
+typedef struct _stream_config {
+	std::string name;           //Название потока
+	stream_direction direction; //Направление потока со стороны внешней сети.
+	stream_type type;           //Тип потока - UDP или TCP
+	stream_msg_order order;     //Упорядочивание сообщений в потоке
+} stream_config;
 
 class IP2VeraMessage {
 public:
@@ -100,6 +108,8 @@ class IP2VeraStreamHub {
 public:
 	virtual ~IP2VeraStreamHub() = 0;
 	virtual P2VeraStream create_stream() = 0;                  //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.
+	virtual P2VeraStream create_instream() = 0;                //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.
+	virtual P2VeraStream create_outstream() = 0;               //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.
 	virtual void unlink_stream(P2VeraStream p2s) = 0;          //Отсоединяет существующий экземпляр потока
 	virtual bool send_message(IP2VeraMessage& p2m) = 0;        //Отправляет сообщение в сеть и другим подсоединенным хабам при необходимости
 	virtual bool add_message_target(RemoteSrvUnit rsu) = 0;    //Добавляет удаленный сервер, который нуждается в получении сообщений от этого хаба

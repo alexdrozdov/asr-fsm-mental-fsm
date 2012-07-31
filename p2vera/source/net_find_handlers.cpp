@@ -351,6 +351,8 @@ bool NetFindInfoHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 		return false;
 	}
 
+	cout << "NetFindInfoHandler::handle_request info - launched" << endl;
+
 	msg_info_rsp mirs;
 	mirs.set_rq_cookie_id(mir.rq_cookie_id());
 	mirs.set_rp_cookie_id(nf->get_uniq_id());
@@ -358,8 +360,43 @@ bool NetFindInfoHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 	mirs.set_name(nf->get_name());
 	mirs.set_cluster(nf->get_cluster());
 
+	//Заполняем список каналов, поддерживаемых этим экземпляром библиотеки
+	for (list<stream_full_cfg>::const_iterator it=nf->streams_begin();it!=nf->streams_end();it++) {
+		cout << "NetFindInfoHandler::handle_request info - added channel" << endl;
+		p2v_channel *p2vc = mirs.add_channels();
+		p2vc->set_name(it->stream_cfg.name);
+		p2vc->set_port(it->port);
+		switch (it->stream_cfg.type) {
+			case stream_type_dgram:
+				p2vc->set_ch_mode(p2v_channel_channel_mode_m2m);
+				p2vc->set_ch_integrity(p2v_channel_channel_integrity_any);
+				break;
+			case stream_type_flow:
+				p2vc->set_ch_mode(p2v_channel_channel_mode_m2m);
+				p2vc->set_ch_integrity(p2v_channel_channel_integrity_complete);
+				break;
+		}
+		switch (it->stream_cfg.direction) {
+				case stream_direction_income:
+					p2vc->set_ep_mode(p2v_channel_endpoint_mode_receiver);
+					break;
+				case stream_direction_outcome:
+					p2vc->set_ep_mode(p2v_channel_endpoint_mode_transmitter);
+					break;
+				case stream_direction_bidir:
+					p2vc->set_ep_mode(p2v_channel_endpoint_mode_tranceiver);
+					break;
+				case stream_direction_loopback:
+					continue; //FIXME Нельзя добавлять поле, прежде чем оно не будет проверено на адекватность
+					break;
+		}
+	}
+
 	string mirs_str = "";
-	mirs.SerializeToString(&mirs_str);
+	if (!mirs.SerializeToString(&mirs_str)) {
+		cout << "NetFindInfoHandler::handle_request error - couldn`t serialize info to string" << endl;
+		return false;
+	}
 
 	msg_wrapper nwrpr;
 	nwrpr.set_msg_id(wrpr->msg_id());
@@ -392,6 +429,8 @@ bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		return false;
 	}
 
+	cout << "NetFindInfoHandler::handle_response info - launched" << endl;
+
 	try {
 		RemoteSrvUnit rsu = nf->get_by_uniq_id(mirs.rp_cookie_id());
 		RemoteNfServer* rnfs = reinterpret_cast<RemoteNfServer*>(rsu.irnfs_ptr());
@@ -416,7 +455,13 @@ bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 			nfc.nf_name = "";
 		}
 		rnfs->update_info(&nfc);
-	} catch (...) {}
+		for (int i=0;i<mirs.channels_size();i++) {
+			const p2v_channel& p2vc = mirs.channels(i);
+			cout << "Channel: " << p2vc.name() << "; port: " << p2vc.port() << endl;
+		}
+	} catch (...) {
+		cout << "NetFindInfoHandler::handle_response error - unknown exception occured" << endl;
+	}
 	return true;
 }
 

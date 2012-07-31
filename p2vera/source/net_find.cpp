@@ -111,6 +111,67 @@ bool NetFind::is_localhost(sockaddr_in& sa) {
 	return false;
 }
 
+int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
+	if (NULL == sh) {
+		cout << "NetFind::register_stream error - null pointer to IP2VeraStreamHub" << endl;
+		return 0;
+	}
+	pthread_mutex_lock(&mtx);
+	if (streams.end() != find_stream(stream_cfg.name)) {
+		cout << "NetFind::register_stream error - stream " << stream_cfg.name << " was already registered" << endl;
+		pthread_mutex_unlock(&mtx);
+		throw;
+	}
+	stream_full_cfg sfc;
+	sfc.stream_cfg.name = stream_cfg.name;
+	sfc.stream_cfg.direction = stream_cfg.direction;
+	sfc.stream_cfg.order = stream_cfg.order;
+	sfc.stream_cfg.type = stream_cfg.type;
+
+	if (stream_type_dgram == stream_cfg.type) {
+		sfc.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	} else {
+		sfc.sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+	}
+
+	memset(&sfc.local_sa, 0, sizeof(sockaddr_in));
+	sfc.local_sa.sin_family = AF_INET;
+	sfc.local_sa.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	cout << "NetFind::register_stream info - поиск свободного порта для " << stream_cfg.name << endl;
+	int rc = -1;
+	sfc.port =  server_port + 10;
+	while (rc < 0) {
+		usleep(1000);
+		sfc.port++;
+		if (sfc.port >= 65535) {
+			cout << "NetFind::register_stream error - couldn`t find free port" << endl;
+			return 0;
+		}
+		sfc.local_sa.sin_port = htons((unsigned short)sfc.port);
+		rc = bind(sfc.sock_fd, (struct sockaddr *)&sfc.local_sa, sizeof(sockaddr_in));
+	}
+
+	sfc.sh = sh;
+	pthread_mutex_unlock(&mtx);
+	return sfc.sock_fd;
+}
+
+std::list<stream_full_cfg>::const_iterator NetFind::streams_begin() {
+	return streams.begin();
+}
+
+std::list<stream_full_cfg>::const_iterator NetFind::streams_end() {
+	return streams.end();
+}
+
+std::list<stream_full_cfg>::iterator NetFind::find_stream(std::string name) {
+	for (std::list<stream_full_cfg>::iterator it=streams.begin();it!=streams.end();it++) {
+		if (it->stream_cfg.name == name) return it;
+	}
+	return streams.end();
+}
+
 
 //Позволяет проверить текущий режим этой копии библиотеки
 bool NetFind::is_server() {
