@@ -7,6 +7,7 @@
 
 
 #include "p2vera.h"
+#include "p2message.h"
 
 int main(int argc, char* argv[]) {
 	P2Vera* p2v = new P2Vera();
@@ -17,9 +18,13 @@ int main(int argc, char* argv[]) {
 	stream_cfg.order = stream_msg_order_any;
 	stream_cfg.type = stream_type_dgram;
 	p2v->register_stream(stream_cfg);
+	p2v->start_network();
 
+	P2VeraStream p2s = p2v->create_outstream("base");
 	while(true) {
-		usleep(1000000);
+		usleep(100000);
+		P2VeraTextMessage p2tm("hello world!");
+		p2s << p2tm;
 	}
 	return 0;
 }

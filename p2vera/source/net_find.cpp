@@ -179,6 +179,23 @@ void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint&
 	pthread_mutex_unlock(&mtx);
 }
 
+void NetFind::unlink_server_stream(IRemoteNfServer* irnfs) {
+	//Просматриваем все зарегистрированные потоки
+	for (list<stream_full_cfg>::iterator it_sfc=streams.begin();it_sfc!=streams.end();it_sfc++) {
+		stream_full_cfg& sfc = *it_sfc;
+
+		//В каждом зарегистрированном потоке ищем удаляемый сервер
+		for (list<remote_endpoint>::iterator re_it=sfc.remote_endpoints.begin();re_it!=sfc.remote_endpoints.end();) {
+			if (re_it->rsu != irnfs) {
+				++re_it;
+				continue;
+			}
+			sfc.sh->remove_message_target(re_it->rsu);
+			re_it = sfc.remote_endpoints.erase(re_it);
+		}
+	}
+}
+
 std::list<stream_full_cfg>::const_iterator NetFind::streams_begin() {
 	return streams.begin();
 }
@@ -521,6 +538,7 @@ void NetFind::invoke_requests() {
 //ожидающих удаления и удален из всех остальных списоков
 void NetFind::unlink_server(IRemoteNfServer* irnfs) {
 	if (NULL == irnfs) return;
+	unlink_server_stream(irnfs);
 
 	string uniq_id = irnfs->get_uniq_id();
 	map<std::string, IRemoteNfServer*>::iterator it_uid = m_str_servers.find(uniq_id);

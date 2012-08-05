@@ -6,6 +6,8 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 #include <iostream>
 #include <list>
@@ -25,6 +27,11 @@ P2VeraStreamHub::P2VeraStreamHub(std::string name) {
 	if (0 != pthread_mutex_init(&mtx, NULL)) {
 		cout << "P2VeraStreamHub::P2VeraStreamHub error - couldn`t create mutex. Fatal." << endl;
 		exit(1);
+	}
+	snd_sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (snd_sock < 0) {
+		cout << "P2VeraStreamHub::P2VeraStreamHub error - couldn`t open socket for sending messages" << endl;
+		perror("socket");
 	}
 }
 
@@ -50,6 +57,10 @@ P2VeraStream P2VeraStreamHub::create_instream() {
 	P2VeraStreamQq* qq = new P2VeraInStreamQq(this);
 	P2VeraStream vs(qq);
 	pthread_mutex_lock(&mtx);
+	//P2VeraStream vs_empty((P2VeraStreamQq*)0xFFFFFFFF);
+	//qqs.push_back(vs_empty);
+	//list<P2VeraStream>::reverse_iterator it = qqs.rbegin();
+	//*it = vs;
 	qqs.push_back(vs);
 	pthread_mutex_unlock(&mtx);
 	return vs;
@@ -88,18 +99,60 @@ bool P2VeraStreamHub::send_message(IP2VeraMessage& p2m) {
 			qq._insert_message(p2bm);
 		}
 	}
-	pthread_mutex_unlock(&mtx);
 	//Рассылаем сообщение всем удаленным хабам, соединенным с текущим хабом
-	return false;
+	for (list<remote_hub>::iterator it=remote_hubs.begin();it!=remote_hubs.end();it++) {
+		sockaddr_in& sa = it->sa;
+		if (sendto(snd_sock, data.data(), data.size(), 0, (sockaddr *)&sa, sizeof(sockaddr_in)) < 0) {
+			cout << "P2VeraStreamHub::send_message error - couldn`t send message" << endl;
+			perror("sendto");
+		}
+	}
+	pthread_mutex_unlock(&mtx);
+	return true;
+}
+
+bool P2VeraStreamHub::receive_message(IP2VeraMessage& p2m) {
+	string data;
+	p2m.get_data(data);
+	P2VeraBasicMessage p2bm(p2m);
+	pthread_mutex_lock(&mtx);
+	for (list<P2VeraStream>::iterator it=qqs.begin();it!=qqs.end();it++) {
+		IP2VeraStreamQq& qq = *(it->get_qq());
+		stream_direction sd = qq.get_stream_direction();
+		if (stream_direction_bidir==sd || stream_direction_income==sd) {
+			qq._insert_message(p2bm);
+		}
+	}
+	pthread_mutex_unlock(&mtx);
+	return true;
 }
 
 bool P2VeraStreamHub::add_message_target(RemoteSrvUnit rsu, int port) {
 	cout << "P2VeraStreamHub::add_message_target info - launched for " << rsu.get_uniq_id() << " at port " << port << endl;
-	return false;
+	pthread_mutex_lock(&mtx);
+	remote_hub rh;
+	rh.rsu = rsu;
+	rh.port = port;
+	memset(&rh.sa, 0, sizeof(sockaddr_in));
+	rh.sa.sin_addr.s_addr = rsu.get_remote_sockaddr().sin_addr.s_addr;
+	rh.sa.sin_port = htons(port);
+	remote_hubs.push_back(rh);
+	pthread_mutex_unlock(&mtx);
+	return true;
 }
 
 bool P2VeraStreamHub::remove_message_target(RemoteSrvUnit rsu) {
-	return false;
+	cout << "P2VeraStreamHub::remove_message_target info - launched for " << rsu.get_uniq_id() << endl;
+	pthread_mutex_lock(&mtx);
+	for (list<remote_hub>::iterator rh_it=remote_hubs.begin();rh_it!=remote_hubs.end();) {
+		if (rh_it->rsu != rsu) {
+			++rh_it;
+			continue;
+		}
+		rh_it = remote_hubs.erase(rh_it);
+	}
+	pthread_mutex_unlock(&mtx);
+	return true;
 }
 
 

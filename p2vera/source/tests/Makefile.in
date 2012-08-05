@@ -5,6 +5,7 @@ CCC=@CC@
 trg_netfind=_tst_net_find.bin
 trg_hub=_tst_hub.bin
 trg_p2vera=_tst_p2vera.bin
+trg_rcv_p2vera=_tst_rcv_p2vera.bin
 BUILD_DIR=@build_dir@
 
 CFLAGS=@CFLAGS@ @includes@ -c 
@@ -13,7 +14,7 @@ LDFLAGS=-rdynamic @LIBS@
 SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-all:$(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) $(BUILD_DIR)/$(trg_p2vera) @install_targets@
+all:$(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) $(BUILD_DIR)/$(trg_p2vera) $(BUILD_DIR)/$(trg_rcv_p2vera) @install_targets@
 
 $(BUILD_DIR)/$(trg_netfind): dirs $(OBJS)
 	@echo [LD] $(trg_netfind); \
@@ -26,11 +27,16 @@ $(BUILD_DIR)/$(trg_hub): dirs $(OBJS)
 $(BUILD_DIR)/$(trg_p2vera): dirs $(OBJS)
 	@echo [LD] $(trg_p2vera); \
 	$(CCP) $(BUILD_DIR)/test_p2vera.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_p2vera)
+	
+$(BUILD_DIR)/$(trg_rcv_p2vera): dirs $(OBJS)
+	@echo [LD] $(trg_rcv_p2vera); \
+	$(CCP) $(BUILD_DIR)/common.o $(BUILD_DIR)/test_rcv.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_rcv_p2vera)
 
 install.gnulinux: FORCE
 	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
 	@cp $(BUILD_DIR)/$(trg_hub) ../../bin/
 	@cp $(BUILD_DIR)/$(trg_p2vera) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_rcv_p2vera) ../../bin/
 	@echo Done
 	
 install.macos: FORCE

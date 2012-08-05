@@ -133,6 +133,7 @@ private:
 	void invoke_requests();
 	void review_remote_servers();
 	void unlink_server(IRemoteNfServer* irnfs); //Начать удаление сервера
+	void unlink_server_stream(IRemoteNfServer* irnfs); //Удалить сервер из списка получателей сообщений
 
 	virtual void load_ifinfo();
 	void reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* rnfs);   //Привязка сервера к его адресу

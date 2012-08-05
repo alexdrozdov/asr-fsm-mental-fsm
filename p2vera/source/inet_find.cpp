@@ -94,4 +94,23 @@ bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh) {
 	return (lh.irnfs == rh.irnfs);
 }
 
+bool operator==(const RemoteSrvUnit& lh, const IRemoteNfServer* irns) {
+	return (irns==lh.irnfs);
+}
+
+bool operator==(const IRemoteNfServer* irns, const RemoteSrvUnit& rh) {
+	return (irns==rh.irnfs);
+}
+
+bool operator!=(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh) {
+	return (lh.irnfs != rh.irnfs);
+}
+
+bool operator!=(const RemoteSrvUnit& lh, const IRemoteNfServer* irns) {
+	return (irns!=lh.irnfs);
+}
+
+bool operator!=(const IRemoteNfServer* irns, const RemoteSrvUnit& rh) {
+	return (irns!=rh.irnfs);
+}
 

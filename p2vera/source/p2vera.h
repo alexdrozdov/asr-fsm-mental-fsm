@@ -18,6 +18,8 @@
 
 #define MD5_DIGEST_LENGTH 16
 
+void* rcv_thread_fcn (void* thread_arg);
+
 class P2Vera {
 public:
 	P2Vera();
@@ -28,16 +30,20 @@ public:
 	virtual P2VeraStream create_outstream(std::string name);  //Создание потока исходящих сообщений
 
 	virtual std::string get_uniq_id();
+
+	friend void* rcv_thread_fcn (void* thread_arg);
 private:
 	char md5_data[MD5_DIGEST_LENGTH];
 	virtual void generate_uniq_id();
 	virtual void create_netfind();
+	virtual void rcv_thread();
 	std::string uniq_id;
 	INetFind* nf;
 
 	bool networking_active;
 	pthread_mutex_t mtx;
 	std::map<std::string, IP2VeraStreamHub*> hubs;
+	std::map<int, IP2VeraStreamHub*> hub_fds;
 };
 
 #endif /* P2VERA_H_ */

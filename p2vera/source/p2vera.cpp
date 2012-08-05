@@ -14,6 +14,9 @@
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
 
+#include <sys/poll.h>
+#include <pthread.h>
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -24,9 +27,11 @@
 #include "net_find.h"
 #include "p2stream.h"
 #include "p2hub.h"
+#include "p2message.h"
 
 using namespace std;
 
+#define MAX_RSP_RCV_BUFLEN 65536
 #define MAX_HOSTNAME_LEN 100
 typedef struct _app_uniq_info {
 	timeval tv_now;
@@ -61,18 +66,56 @@ void P2Vera::register_stream(stream_config& stream_cfg) {
 	}
 	IP2VeraStreamHub* sh = new P2VeraStreamHub(stream_cfg.name);
 	hubs[stream_cfg.name] = sh;
-	nf->register_stream(stream_cfg, sh);
+	int fd = nf->register_stream(stream_cfg, sh);
+	hub_fds[fd] = sh;
 	pthread_mutex_unlock(&mtx);
 }
 
 void P2Vera::start_network() {
+	pthread_t thread_id;
+	pthread_create(&thread_id, NULL, &rcv_thread_fcn, this); //Поток, выполняющий роль сервера
 	networking_active = true;
+}
+
+void P2Vera::rcv_thread() {
+	pthread_mutex_lock(&mtx);
+	int fd_count = hub_fds.size();
+	pollfd *pfd = new pollfd[fd_count];
+	int fd_cnt = 0;
+	for (map<int, IP2VeraStreamHub*>::iterator it=hub_fds.begin();it!=hub_fds.end();it++) {
+		pfd[fd_cnt].fd = it->first;
+		pfd[fd_cnt].events = POLLIN | POLLHUP;
+		pfd[fd_cnt].revents = 0;
+	}
+	pthread_mutex_unlock(&mtx);
+	unsigned char rcv_buf[MAX_RSP_RCV_BUFLEN] = {0};
+	sockaddr_in remote_addr;
+	socklen_t remote_addrlen = sizeof(sockaddr_in);
+
+	while (true) {
+		if (poll(pfd, fd_count, 100) < 1) {
+			continue;
+		}
+		for (int i=0;i<fd_count;i++) {
+			if (0==pfd[i].revents) continue;
+			pfd[i].revents = 0;
+			int rc = recvfrom(pfd[i].fd, rcv_buf, MAX_RSP_RCV_BUFLEN, 0, (sockaddr*)&remote_addr, &remote_addrlen);
+			if(rc < 0) {
+				continue;
+			}
+			IP2VeraStreamHub* sh = hub_fds[pfd[i].fd];
+			P2VeraTextMessage p2tm;
+			p2tm.set_data(rcv_buf, rc);
+			sh->receive_message(p2tm);
+		}
+	}
+	delete[] pfd;
 }
 
 P2VeraStream P2Vera::create_stream(std::string name) {
 	pthread_mutex_lock(&mtx);
 	map<std::string, IP2VeraStreamHub*>::iterator it = hubs.find(name);
-	if (hubs.end() != it) {
+	if (hubs.end() == it) {
 		pthread_mutex_unlock(&mtx);
 		throw;
 	}
@@ -85,7 +128,7 @@ P2VeraStream P2Vera::create_stream(std::string name) {
 P2VeraStream P2Vera::create_instream(std::string name) {
 	pthread_mutex_lock(&mtx);
 	map<std::string, IP2VeraStreamHub*>::iterator it = hubs.find(name);
-	if (hubs.end() != it) {
+	if (hubs.end() == it) {
 		pthread_mutex_unlock(&mtx);
 		throw;
 	}
@@ -98,7 +141,7 @@ P2VeraStream P2Vera::create_instream(std::string name) {
 P2VeraStream P2Vera::create_outstream(std::string name) {
 	pthread_mutex_lock(&mtx);
 	map<std::string, IP2VeraStreamHub*>::iterator it = hubs.find(name);
-	if (hubs.end() != it) {
+	if (hubs.end() == it) {
 		pthread_mutex_unlock(&mtx);
 		throw;
 	}
@@ -153,3 +196,11 @@ void P2Vera::generate_uniq_id() {
 std::string P2Vera::get_uniq_id() {
 	return uniq_id;
 }
+
+void* rcv_thread_fcn(void* thread_arg) {
+	P2Vera* p2v = reinterpret_cast<P2Vera*>(thread_arg);
+	p2v->rcv_thread();
+	return NULL;
+}
+
+

@@ -103,12 +103,22 @@ public:
 	RemoteSrvUnit& operator=(RemoteSrvUnit& original);
 	friend class INetFind;
 	friend bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+	friend bool operator==(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+	friend bool operator==(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
+	friend bool operator!=(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+	friend bool operator!=(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+	friend bool operator!=(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
 private:
 	IRemoteNfServer* irnfs;
 protected:
 };
 
 extern bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+extern bool operator==(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+extern bool operator==(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
+extern bool operator!=(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+extern bool operator!=(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+extern bool operator!=(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
 
 //Интерфейс класса, обнаруживающего и отслеживающего списки приложений в сети
 class INetFind {

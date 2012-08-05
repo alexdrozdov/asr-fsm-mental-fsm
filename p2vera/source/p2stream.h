@@ -56,7 +56,8 @@ class P2VeraStream {
 public:
 	P2VeraStream();
 	P2VeraStream(IP2VeraStreamQq* qq);
-	P2VeraStream(const P2VeraStream& pvis); //
+	P2VeraStream(const P2VeraStream& pvis);
+	~P2VeraStream();
 	virtual P2VeraStream& operator=(const P2VeraStream& pvis);
 	virtual P2VeraStream& operator<<(IP2VeraMessage& p2m);
 	virtual P2VeraStream& operator>>(IP2VeraMessage& p2m);
@@ -112,6 +113,7 @@ public:
 	virtual P2VeraStream create_outstream() = 0;               //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.
 	virtual void unlink_stream(P2VeraStream p2s) = 0;          //Отсоединяет существующий экземпляр потока
 	virtual bool send_message(IP2VeraMessage& p2m) = 0;        //Отправляет сообщение в сеть и другим подсоединенным хабам при необходимости
+	virtual bool receive_message(IP2VeraMessage& p2m) = 0;     //Отправляет сообщение в сеть и другим подсоединенным хабам при необходимости
 	virtual bool add_message_target(RemoteSrvUnit rsu, int port) = 0; //Добавляет удаленный сервер, который нуждается в получении сообщений от этого хаба
 	virtual bool remove_message_target(RemoteSrvUnit rsu) = 0; //Удаляет сервер. Хаб должен прекратить передачу сообщений этому серверу
 };
