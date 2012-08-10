@@ -1,0 +1,31 @@
+# P2Vera config
+
+#Настройки локального сервера
+[local_server]
+name = "p2v_rcv"
+caption = "P2Vera Message Listener"
+hash = ""
+server_port = 7300
+min_client_port = 7301
+max_client_port = 7400
+disable_udp = false
+disable_tcp = false
+start_network = false
+
+#Настройки обнаружения сервером других серверов и видимости сервера для других серверов
+[discover]
+remote_server = "192.168.0.17:7300"
+remote_server = "192.168.0.18"
+broadcast_server = "127.0.0.1"
+broadcast_server = "192.168.0.0"
+restrict = "192.168.0.19"
+
+#Список потоков, которые видит сервер по-умолчанию
+[streams]
+allow_append = true
+stream = "base"
+stream = "error"
+stream = "info"
+stream = "warning"
+restrict = "hello"
+
