@@ -61,13 +61,19 @@ void P2Vera::register_stream(stream_config& stream_cfg) {
 	}
 	map<std::string, IP2VeraStreamHub*>::iterator it = hubs.find(stream_cfg.name);
 	if (hubs.end() != it) {
+		cout << "P2Vera::register_stream warning - stream " << stream_cfg.name << " was already registered" << endl;
 		pthread_mutex_unlock(&mtx);
 		return;
 	}
 	IP2VeraStreamHub* sh = new P2VeraStreamHub(stream_cfg.name);
 	hubs[stream_cfg.name] = sh;
-	int fd = nf->register_stream(stream_cfg, sh);
-	hub_fds[fd] = sh;
+	if (stream_cfg.type == stream_type_dgram) { //Управление файловыми дескрипторами выполняется в объекте
+		//NetFind. Поэтому рвозвращенный файловый дескриптор добавляется в массив
+		int fd = nf->register_stream(stream_cfg, sh);
+		hub_fds[fd] = sh;
+	} else { //Управление файловыми дескрипторами выполняется в специализированном объекте внутри NetFind. В этом классе файловый дескриптор не добавляется
+		nf->register_stream(stream_cfg, sh);
+	}
 	pthread_mutex_unlock(&mtx);
 }
 

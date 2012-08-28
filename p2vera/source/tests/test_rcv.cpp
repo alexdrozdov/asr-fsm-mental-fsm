@@ -106,8 +106,8 @@ int main(int argc, const char *argv[]) {
 		stream_config stream_cfg;
 		stream_cfg.name = *it;
 		stream_cfg.direction = stream_direction_income;
-		stream_cfg.order = stream_msg_order_any;
-		stream_cfg.type = stream_type_dgram;
+		stream_cfg.order = stream_msg_order_strict;
+		stream_cfg.type = stream_type_flow;
 		p2v->register_stream(stream_cfg);
 
 		P2VeraStream p2s = p2v->create_instream(*it);

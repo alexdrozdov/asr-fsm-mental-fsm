@@ -457,6 +457,13 @@ bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 			const p2v_channel& p2vc = mirs.channels(i);
 			remote_endpoint re;
 			re.remote_port = p2vc.port();
+			switch (p2vc.ch_integrity()) { //В зависимости от заявленной надежности каналу устанавливаем способ доставки данных до конечной точки
+				case p2v_channel_channel_integrity_any:
+					re.str_type = stream_type_dgram;
+					break;
+				default:
+					re.str_type = stream_type_flow;
+			}
 			re.rsu = rsu;
 			nf->register_remote_endpoint(p2vc.name(), re);
 			//cout << "Channel: " << p2vc.name() << "; port: " << p2vc.port() << endl;

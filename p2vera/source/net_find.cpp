@@ -26,6 +26,8 @@
 #include "msg_wrapper.pb.h"
 #include "msg_netfind.pb.h"
 
+#include "tcpstream.h"
+
 #include "mtx_containers.h"
 #include "mtx_containers.hpp"
 
@@ -80,6 +82,8 @@ NetFind::NetFind(net_find_config *nfc) {
 	msg_handlers[1] = info_handler;
 	msg_handlers[2] = list_handler;
 
+	tcm = new TcpStreamManager(8000);
+
 	//Создаем потоки
 	pthread_t thread_id;
 	pthread_create(&thread_id, NULL, &nf_server_rsp_thread_fcn, this); //Поток, выполняющий роль сервера
@@ -111,14 +115,10 @@ bool NetFind::is_localhost(sockaddr_in& sa) {
 	return false;
 }
 
-int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
-	if (NULL == sh) {
-		cout << "NetFind::register_stream error - null pointer to IP2VeraStreamHub" << endl;
-		return 0;
-	}
+int NetFind::register_dgram_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
 	pthread_mutex_lock(&mtx);
 	if (streams.end() != find_stream(stream_cfg.name)) {
-		cout << "NetFind::register_stream error - stream " << stream_cfg.name << " was already registered" << endl;
+		cout << "NetFind::register_dgram_stream error - stream " << stream_cfg.name << " was already registered" << endl;
 		pthread_mutex_unlock(&mtx);
 		throw;
 	}
@@ -128,24 +128,20 @@ int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
 	sfc.stream_cfg.order = stream_cfg.order;
 	sfc.stream_cfg.type = stream_cfg.type;
 
-	if (stream_type_dgram == stream_cfg.type) {
-		sfc.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
-	} else {
-		sfc.sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-	}
+	sfc.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	memset(&sfc.local_sa, 0, sizeof(sockaddr_in));
 	sfc.local_sa.sin_family = AF_INET;
 	sfc.local_sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	cout << "NetFind::register_stream info - поиск свободного порта для " << stream_cfg.name << endl;
+	cout << "NetFind::register_dgram_stream info - поиск свободного порта для " << stream_cfg.name << endl;
 	int rc = -1;
 	sfc.port =  server_port + 10;
 	while (rc < 0) {
 		usleep(1000);
 		sfc.port++;
 		if (sfc.port >= 65535) {
-			cout << "NetFind::register_stream error - couldn`t find free port" << endl;
+			cout << "NetFind::register_dgram_stream error - couldn`t find free port" << endl;
 			return 0;
 		}
 		sfc.local_sa.sin_port = htons((unsigned short)sfc.port);
@@ -158,25 +154,77 @@ int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
 	return sfc.sock_fd;
 }
 
-void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint& re) {
+int NetFind::register_flow_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
 	pthread_mutex_lock(&mtx);
-	list<stream_full_cfg>::iterator it = find_stream(stream_name);
-	if (streams.end() == it) { //Такой поток не зарегистрирован.
+	if (streams.end() != find_stream(stream_cfg.name)) {
+		cout << "NetFind::register_flow_stream error - stream " << stream_cfg.name << " was already registered" << endl;
 		pthread_mutex_unlock(&mtx);
-		return;
+		throw;
 	}
-	stream_full_cfg& sfc = *it;
+	stream_full_cfg sfc;
+	sfc.stream_cfg.name = stream_cfg.name;
+	sfc.stream_cfg.direction = stream_cfg.direction;
+	sfc.stream_cfg.order = stream_cfg.order;
+	sfc.stream_cfg.type = stream_cfg.type;
 
-	//Ищем, переданный endpoint среди ранее зарегистрированных
-	for (list<remote_endpoint>::iterator re_it=sfc.remote_endpoints.begin();re_it!=sfc.remote_endpoints.end();re_it++) {
-		if (re_it->rsu == re.rsu) { //Такой сервер уже обработан и зарегистрирован
+	sfc.sock_fd = tcm->get_fd();
+	sfc.port = tcm->get_port();
+
+	sfc.sh = sh;
+	streams.push_back(sfc);
+	pthread_mutex_unlock(&mtx);
+	return 0;
+}
+
+int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
+	if (NULL == sh) {
+		cout << "NetFind::register_stream error - null pointer to IP2VeraStreamHub" << endl;
+		return 0;
+	}
+
+	switch(stream_cfg.type) {
+		case stream_type_dgram:
+			return register_dgram_stream(stream_cfg, sh);
+			break;
+		case stream_type_flow:
+			return register_flow_stream(stream_cfg, sh);
+			break;
+		default:
+			cout << "NetFind::register_stream error - unsupported stream type" << endl;
+	}
+	return 0;
+}
+
+void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint& re) {
+	if (stream_type_dgram == re.str_type) {
+		pthread_mutex_lock(&mtx);
+		list<stream_full_cfg>::iterator it = find_stream(stream_name);
+		if (streams.end() == it) { //Такой поток не зарегистрирован.
 			pthread_mutex_unlock(&mtx);
 			return;
 		}
+		stream_full_cfg& sfc = *it;
+
+		//Ищем, переданный endpoint среди ранее зарегистрированных
+		for (list<remote_endpoint>::iterator re_it=sfc.remote_endpoints.begin();re_it!=sfc.remote_endpoints.end();re_it++) {
+			if (re_it->rsu == re.rsu) { //Такой сервер уже обработан и зарегистрирован
+				pthread_mutex_unlock(&mtx);
+				return;
+			}
+		}
+		sfc.remote_endpoints.push_back(re);
+		if (NULL == sfc.sh) {
+			cout << "NetFind::register_remote_endpoint error - zero pointer to stream hub" << endl;
+			pthread_mutex_unlock(&mtx);
+			return;
+		}
+		sfc.sh->add_message_target(re.rsu, re.remote_port);
+		pthread_mutex_unlock(&mtx);
+	} else if (stream_type_flow == re.str_type) {
+		pthread_mutex_lock(&mtx);
+		tcm->add_server(re.rsu, re.remote_port);
+		pthread_mutex_unlock(&mtx);
 	}
-	sfc.remote_endpoints.push_back(re);
-	sfc.sh->add_message_target(re.rsu, re.remote_port);
-	pthread_mutex_unlock(&mtx);
 }
 
 void NetFind::unlink_server_stream(IRemoteNfServer* irnfs) {
@@ -529,9 +577,9 @@ void NetFind::invoke_requests() {
 	}
 
 	//При необходимости собираем информацию о других серверах, работающих на этом хосте
-	if (list_handler->requires_server_list()) {
-		list_handler->RequestLocalhost();
-	}
+	//if (list_handler->requires_server_list()) {
+	//	list_handler->RequestLocalhost();
+	//}
 }
 
 //Подготовить сервер к удалению. Сервер должен быть перемещен в список

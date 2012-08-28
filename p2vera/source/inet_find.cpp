@@ -32,24 +32,28 @@ RemoteSrvUnit::RemoteSrvUnit() {
 
 RemoteSrvUnit::RemoteSrvUnit(const RemoteSrvUnit& original) {
 	irnfs = original.irnfs;
-	irnfs->increase_ref_count();
+	if (irnfs) irnfs->increase_ref_count();
 }
 
 RemoteSrvUnit::~RemoteSrvUnit() {
+	if (!irnfs) return;
 	if (0 == irnfs->decrease_ref_count()) { //Больше на этот объект ссылок не осталось. Удаляем его.
 		delete irnfs;
 	}
 }
 
 bool RemoteSrvUnit::is_alive() {
+	if (!irnfs) return false;
 	return irnfs->is_alive();
 }
 
 bool RemoteSrvUnit::is_broadcast() {
+	if (!irnfs) return false;
 	return irnfs->is_broadcast();
 }
 
 bool RemoteSrvUnit::is_localhost() {
+	if (!irnfs) return false;
 	return irnfs->is_localhost();
 }
 
@@ -79,14 +83,14 @@ IRemoteNfServer* RemoteSrvUnit::irnfs_ptr() {
 
 RemoteSrvUnit& RemoteSrvUnit::operator=(RemoteSrvUnit& original) {
 	irnfs = original.irnfs;
-	irnfs->increase_ref_count();
+	if (irnfs) irnfs->increase_ref_count();
 	return *this;
 }
 
 RemoteSrvUnit& RemoteSrvUnit::operator=(IRemoteNfServer* original) {
 	cout << "RemoteSrvUnit::operator= error - null pointer to remote server interface" << endl;
 	irnfs = original;
-	irnfs->increase_ref_count();
+	if (irnfs) irnfs->increase_ref_count();
 	return *this;
 }
 

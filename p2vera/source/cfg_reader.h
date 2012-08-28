@@ -20,6 +20,11 @@ public:
 	//std::string std::string();
 	operator int();
 	operator bool();
+	operator std::string();
+
+	std::string to_string() const;
+	int to_int() const;
+	bool to_bool() const;
 
 	friend class CfgReaderIterator;
 	friend class CfgReader;
@@ -30,22 +35,23 @@ private:
 };
 
 typedef std::list<CfgItem> cfg_list;
-typedef cfg_list::const_iterator cfg_item_iter;
+typedef cfg_list::iterator cfg_item_iter;
 
 class CfgReaderIterator {
 public:
 	CfgReaderIterator(std::string section, std::string name, cfg_item_iter cii, CfgReader* cr);
-	CfgReaderIterator(CfgReaderIterator& cri);
+	CfgReaderIterator(const CfgReaderIterator& cri);
 	virtual ~CfgReaderIterator();
 	CfgReaderIterator& operator=(CfgReaderIterator& cri);
 	CfgReaderIterator& operator++();
-	const CfgItem& operator->();
+	CfgReaderIterator& operator++(int);
+	const CfgItem* operator->();
 	friend bool operator==(CfgReaderIterator& lh, CfgReaderIterator& rh);
 	friend bool operator==(CfgReaderIterator& lh, cfg_item_iter& rh);
 	friend bool operator==(cfg_item_iter& lh, CfgReaderIterator& rh);
-	friend bool operator!=(CfgReaderIterator& lh, CfgReaderIterator& rh);
-	friend bool operator!=(CfgReaderIterator& lh, cfg_item_iter& rh);
-	friend bool operator!=(cfg_item_iter& lh, CfgReaderIterator& rh);
+	friend bool operator!=(const CfgReaderIterator lh, const CfgReaderIterator rh);
+	friend bool operator!=(const CfgReaderIterator lh, cfg_item_iter rh);
+	friend bool operator!=(cfg_item_iter lh, const CfgReaderIterator rh);
 private:
 	std::string section;
 	std::string name;
@@ -56,9 +62,9 @@ private:
 bool operator==(CfgReaderIterator& lh, CfgReaderIterator& rh);
 bool operator==(CfgReaderIterator& lh, cfg_item_iter& rh);
 bool operator==(cfg_item_iter& lh, CfgReaderIterator& rh);
-bool operator!=(CfgReaderIterator& lh, CfgReaderIterator& rh);
-bool operator!=(CfgReaderIterator& lh, cfg_item_iter& rh);
-bool operator!=(cfg_item_iter& lh, CfgReaderIterator& rh);
+bool operator!=(const CfgReaderIterator lh, const CfgReaderIterator rh);
+bool operator!=(const CfgReaderIterator lh, cfg_item_iter rh);
+bool operator!=(cfg_item_iter lh, const CfgReaderIterator rh);
 
 class CfgReader {
 public:
@@ -71,6 +77,10 @@ public:
 	friend class CfgReaderIterator;
 private:
 	cfg_list items;
+	std::string current_section;
+
+	void parse_section(const char *str, int len);
+	void parse_option(const char *str, int len);
 };
 
 #endif /* CFG_READER_H_ */

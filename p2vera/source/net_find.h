@@ -29,6 +29,7 @@
 #include "mtx_containers.hpp"
 
 #include "p2stream.h"
+#include "tcpstream.h"
 
 #define MAX_FAILURES_COUNT 5
 #define MAX_PING_RESP_TIMEOUT 1
@@ -51,6 +52,7 @@ typedef struct _rmt_ping {
 typedef struct _remote_endpoint {
 	RemoteSrvUnit rsu;
 	int remote_port;
+	stream_type str_type;
 } remote_endpoint;
 
 typedef struct _stream_full_cfg {
@@ -137,6 +139,11 @@ private:
 
 	virtual void load_ifinfo();
 	void reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* rnfs);   //Привязка сервера к его адресу
+
+	virtual int register_dgram_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh);
+	virtual int register_flow_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh);
+
+	TcpStreamManager *tcm; //Компонент, управляющий tcp-соединениями
 
 
 	std::map<int, INetFindMsgHandler*> msg_handlers; //Обработчики сетевых сообщений, приходящих по протоколу UDP

@@ -15,6 +15,7 @@
 
 #include "inet_find.h"
 #include "p2stream.h"
+#include "tcpstream.h"
 
 #define MD5_DIGEST_LENGTH 16
 
