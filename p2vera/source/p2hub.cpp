@@ -24,6 +24,7 @@ IP2VeraStreamHub::~IP2VeraStreamHub() {
 
 
 P2VeraStreamHub::P2VeraStreamHub(std::string name) {
+	this->name = name;
 	if (0 != pthread_mutex_init(&mtx, NULL)) {
 		cout << "P2VeraStreamHub::P2VeraStreamHub error - couldn`t create mutex. Fatal." << endl;
 		exit(1);
@@ -44,6 +45,10 @@ P2VeraStreamHub::~P2VeraStreamHub() {
 	pthread_mutex_unlock(&mtx);
 
 	pthread_mutex_destroy(&mtx);
+}
+
+std::string P2VeraStreamHub::get_name() {
+	return name;
 }
 
 P2VeraStream P2VeraStreamHub::create_stream() {

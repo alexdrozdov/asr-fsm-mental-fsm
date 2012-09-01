@@ -38,6 +38,7 @@ public:
 private:
 	int process_buffer(unsigned char* buf, int len);
 	int process_message(unsigned char* buf, int len);
+	bool send_data(std::string data);          //Упаковка данных в стартовый и стоповый байты и передача по сети
 	RemoteSrvUnit rsu;
 	int remote_port;
 	int fd;
@@ -50,6 +51,8 @@ private:
 	unsigned char *cur_buf; //Текущий буфер для декодируемого сообщения
 	unsigned char *pcur_buf;
 	int cur_buf_usage; //Количество использованных ячеек буфера
+
+	int coded_length[256];
 };
 
 struct rsu_fd_item {
@@ -67,6 +70,8 @@ public:
 	void remove_server(RemoteSrvUnit& rsu);
 	int get_fd();
 	int get_port();
+
+	TcpStream* find_stream(RemoteSrvUnit rsu);
 
 	friend void* tcp_accept_thread_fcn (void* thread_arg);
 	friend void* tcp_poll_thread_fcn (void* thread_arg);

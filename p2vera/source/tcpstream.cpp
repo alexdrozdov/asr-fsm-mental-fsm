@@ -21,6 +21,7 @@
 #include "p2stream.h"
 #include "p2message.h"
 #include "tcpstream.h"
+#include "crc.h"
 
 #include "msg_tcpstream.pb.h"
 
@@ -48,6 +49,13 @@ TcpStream::TcpStream(RemoteSrvUnit& rsu, int remote_port) {
 	cout << "TcpStream::TcpStream info - launched as master for remote server" << endl;
 	this->rsu = rsu;
 	this->remote_port = remote_port;
+
+	for (int i=0;i<256;i++) {
+		coded_length[i] = 1;
+	}
+	coded_length[FRAME_START]  = 2;
+	coded_length[FRAME_END]    = 2;
+	coded_length[FRAME_ESCAPE] = 2;
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	fcntl(fd, F_SETFL, 0);
@@ -78,6 +86,13 @@ TcpStream::TcpStream(int socket) {
 	fd = socket;
 	remote_port = 0;
 
+	for (int i=0;i<256;i++) {
+		coded_length[i] = 1;
+	}
+	coded_length[FRAME_START]  = 2;
+	coded_length[FRAME_END]    = 2;
+	coded_length[FRAME_ESCAPE] = 2;
+
 	buf_proc_state = 0;
 	cur_buf = new unsigned char[MAX_RCV_BUF];
 	pcur_buf = cur_buf;
@@ -101,17 +116,44 @@ void TcpStream::add_hub(IP2VeraStreamHub* p2h) {
 	}
 	flow_to_hub[last_flow_id] = p2h;
 	hub_to_flow[p2h] = last_flow_id;
+
+	//Формируем сообщение с названием потока и будущим идентификатором
+	tcp_wrapper tw;
+	msg_add_flow_rq* mafr = tw.mutable_add_flow_rq();
+	mafr->set_rq_cookie_id("");
+	mafr->set_flow_name(p2h->get_name());
+	mafr->set_flow_id(last_flow_id);
+	string tw_str;
+	tw.SerializeToString(&tw_str);
+	send_data(tw_str); //Отправка сформированного сообщения на создание потока удаленному серверу
 }
 
 
 
 void TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
+	if (NULL == p2h) return;
+	map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(p2h);
+	if (p2h_it != hub_to_flow.end()) {
+		cout << "TcpStream::send_message - trying to send message to unregistered hub " << p2h->get_name() << endl;
+		return;
+	}
+	int flow_id = p2h_it->second;
+	tcp_wrapper tw;
+	tcp_flow_wrapper *tfw = tw.add_tcp_flow();
+	tfw->set_flow_id(flow_id);
+	string p2m_str;
+	p2m.get_data(p2m_str);
+	tfw->set_flow_data(p2m_str);
+	string tw_str;
+	tw.SerializeToString(&tw_str);
+	send_data(tw_str); //Отправка сформированного сообщения удаленному серверу
 }
 
 void TcpStream::receive_message() {
 	int ret = 0;
 	unsigned char buf[1024];
 	while( (ret = read(fd, buf, 1024))>0 ) {
+		cout << "TcpStream::receive_message info - ret=" << ret << endl;
 		process_buffer(buf,ret);
 	}
 }
@@ -120,6 +162,10 @@ void TcpStream::receive_message() {
 int TcpStream::process_buffer(unsigned char* buf, int len) {
 	unsigned char* pbuf = buf;
 
+	for (int j=0;j<len;j++) {
+		cout << " 0x" << hex << (unsigned int)buf[j];
+	}
+	cout << endl;
 	int i = 0;
 	while (i<len) {
 		switch (buf_proc_state) {
@@ -153,7 +199,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 					buf_proc_state = bps_escape;
 					break;
 				} else if (FRAME_START == *pbuf) {
-					cout << "CNetLink::process_buffer atacked - frame start in message body" << endl;
+					cout << "TcpStream::process_buffer atacked - frame start in message body" << endl;
 
 					cout << "Position " << i << endl;
 
@@ -167,7 +213,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 						//Фрейм имеет правильную струткуру, но содержит менее 8 байт
 						//В нем гарантированно отсутствует контрольная сумма
 						//Проверить правильность данных в этом буфере невозможно
-						cout << "CNetLink::process_buffer atacked - frame is too short to be valid" << endl;
+						cout << "TcpStream::process_buffer atacked - frame is too short to be valid" << endl;
 						exit(4);
 					}
 					process_message(cur_buf,cur_buf_usage-2); //- CRC-16 length
@@ -182,7 +228,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 				i++;
 				pbuf++;
 				if (MAX_RCV_BUF <= cur_buf_usage) {
-					cout << "CNetLink::process_buffer atacked - frame length overflow" << endl;
+					cout << "TcpStream::process_buffer atacked - frame length overflow" << endl;
 					cout << "Will now exit" << endl;
 					exit(4);
 				}
@@ -198,7 +244,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 					} else if (FRAME_ESCAPE == *pbuf) {
 						c = FRAME_ESCAPE;
 					} else {
-						cout << "CNetLink::process_buffer atacked - unknown escape symbol" << endl;
+						cout << "TcpStream::process_buffer atacked - unknown escape symbol" << endl;
 						cout << "Will now exit" << endl;
 						exit(4);
 					}
@@ -209,7 +255,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 					pbuf++;
 					buf_proc_state = bps_body;
 					if (MAX_RCV_BUF <= cur_buf_usage) {
-						cout << "CNetLink::process_buffer atacked - frame length overflow" << endl;
+						cout << "TcpStream::process_buffer atacked - frame length overflow" << endl;
 						cout << "Will now exit" << endl;
 						exit(4);
 					}
@@ -218,6 +264,72 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 		}
 	}
 	return 0;
+}
+
+bool TcpStream::send_data(std::string data) {
+	cout << "TcpStream::send_data info - sent some data" << endl;
+	//Определяем длину сообщения после его кодирования
+	int msg_len = 0;
+	cout << "TcpStream::send_data info - data.length()=" << data.length() << endl;
+	int data_len = data.length();
+	for (int i=0;i<data_len;i++) {
+		unsigned char c = (unsigned char)data[i];
+		msg_len += coded_length[c];
+		cout << (unsigned int)c << " " << coded_length[c] << endl;
+	}
+	msg_len += 4; // FRAME_START + CRC-16 + FRAME_END
+	cout << "TcpStream::send_data info - msg_len=" << msg_len << endl;
+
+	unsigned char *coded_msg = new unsigned char[msg_len];
+	unsigned char *pcoded_msg = coded_msg;
+
+	*pcoded_msg = FRAME_START;
+	pcoded_msg++;
+
+	unsigned short crc = CRC_INIT;
+
+	for (int i=0;i<data_len;i++) {
+		unsigned char c = (unsigned char)data[i];
+		CRC(crc, c);
+		if (FRAME_START == c) {
+			pcoded_msg[0] = FRAME_ESCAPE;
+			pcoded_msg[1] = 0xCB;
+			pcoded_msg += 2;
+			continue;
+		}
+		if (FRAME_END == c) {
+			pcoded_msg[0] = FRAME_ESCAPE;
+			pcoded_msg[1] = 0xCE;
+			pcoded_msg += 2;
+			continue;
+		}
+		if (FRAME_ESCAPE == c) {
+			pcoded_msg[0] = FRAME_ESCAPE;
+			pcoded_msg[1] = FRAME_ESCAPE;
+			pcoded_msg += 2;
+			continue;
+		}
+		pcoded_msg[0] = c;
+		pcoded_msg++;
+	}
+
+	coded_msg[msg_len-3] = 0;//(crc&0xFF00) >> 8;
+	coded_msg[msg_len-2] = 0;//crc & 0xFF;
+	coded_msg[msg_len-1] = FRAME_END;
+
+	int send_res = send(fd, coded_msg, msg_len, 0);//MSG_DONTWAIT);
+	delete[] coded_msg;
+	if (-1 == send_res) {
+		if (EAGAIN == errno) {
+			cout << "TcpStream::send_data error - socket overflow" << endl;
+		} else {
+			cout << "TcpStream::send_data error - " << errno << endl;
+			cout << strerror(errno) << endl;
+			//exit(3); //FIXME Выходить здесь не надо. Надо повторно установить соединение
+		}
+	}
+
+	return true;
 }
 
 int TcpStream::process_message(unsigned char* buf, int len) {
@@ -316,6 +428,19 @@ int TcpStreamManager::accept_thread() {
 	return 0;
 }
 
+TcpStream* TcpStreamManager::find_stream(RemoteSrvUnit rsu) {
+	TcpStream* tc = NULL;
+	pthread_mutex_lock(&mtx);
+	for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
+		if (rsu == it->rsu) {
+			tc = it->tcp_stream;
+			break;
+		}
+	}
+	pthread_mutex_unlock(&mtx);
+	return tc;
+}
+
 void TcpStreamManager::add_server(RemoteSrvUnit& rsu, int remote_port) {
 	pthread_mutex_lock(&mtx);
 	for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
@@ -384,6 +509,7 @@ void TcpStreamManager::rcv_thread() {
 		pthread_mutex_lock(&mtx);
 		for (int i=0;i<last_rsu_fd_count;i++) {
 			if (0==pfd[i].revents) continue;
+			cout << "TcpStreamManager::rcv_thread info - received some tcp message " << i << " " << pfd[i].revents << endl;
 			pfd[i].revents = 0;
 			for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
 				if (pfd[i].fd == it->fd) {

@@ -108,6 +108,7 @@ public:
 class IP2VeraStreamHub {
 public:
 	virtual ~IP2VeraStreamHub() = 0;
+	virtual std::string get_name() = 0;                        //Возвращает название потока, для которого создан хаб
 	virtual P2VeraStream create_stream() = 0;                  //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.
 	virtual P2VeraStream create_instream() = 0;                //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.
 	virtual P2VeraStream create_outstream() = 0;               //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.

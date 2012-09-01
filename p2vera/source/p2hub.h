@@ -31,6 +31,7 @@ public:
 	P2VeraStreamHub(std::string name);
 	virtual ~P2VeraStreamHub();
 
+	virtual std::string get_name();                        //Возвращает название потока, для которого создан хаб
 	virtual P2VeraStream create_stream();                  //Создает новый экземляр двунаправленного потока, подсоединенного к хабу.
 	virtual P2VeraStream create_instream();                //Создает новый экземляр входящего потока, подсоединенного к хабу.
 	virtual P2VeraStream create_outstream();               //Создает новый экземляр исходящего потока, подсоединенного к хабу.
@@ -45,6 +46,7 @@ private:
 	int snd_sock;
 	std::list<P2VeraStream> qqs;
 	std::list<remote_hub> remote_hubs;
+	std::string name;
 };
 
 

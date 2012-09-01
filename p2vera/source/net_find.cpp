@@ -222,7 +222,16 @@ void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint&
 		pthread_mutex_unlock(&mtx);
 	} else if (stream_type_flow == re.str_type) {
 		pthread_mutex_lock(&mtx);
-		tcm->add_server(re.rsu, re.remote_port);
+		list<stream_full_cfg>::iterator it = find_stream(stream_name);
+		if (streams.end() == it) { //Такой поток не зарегистрирован.
+			pthread_mutex_unlock(&mtx);
+			return;
+		}
+
+		tcm->add_server(re.rsu, re.remote_port);  //Добавляем вновь найденный сервер (при его отсутствии)
+		TcpStream* tc = tcm->find_stream(re.rsu); //Ищем вновь созданный поток
+		//FIXME Сервер может оказаться недоступным. Проверять возвращенное значение
+		tc->add_hub(it->sh); //Добавляем хаб с указанным именем к списку хабов, связанных с этим сервером
 		pthread_mutex_unlock(&mtx);
 	}
 }
