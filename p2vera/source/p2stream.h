@@ -105,6 +105,8 @@ public:
 	virtual void _insert_message(P2VeraBasicMessage& p2m) = 0;
 };
 
+class TcpStream;
+
 class IP2VeraStreamHub {
 public:
 	virtual ~IP2VeraStreamHub() = 0;
@@ -117,6 +119,7 @@ public:
 	virtual bool receive_message(IP2VeraMessage& p2m) = 0;     //Отправляет сообщение в сеть и другим подсоединенным хабам при необходимости
 	virtual bool add_message_target(RemoteSrvUnit rsu, int port) = 0; //Добавляет удаленный сервер, который нуждается в получении сообщений от этого хаба
 	virtual bool remove_message_target(RemoteSrvUnit rsu) = 0; //Удаляет сервер. Хаб должен прекратить передачу сообщений этому серверу
+	virtual bool add_tcp_stream(TcpStream* tcs) = 0;           //Добавляет tcp соединение. Данные должны отправляться в это соединение
 };
 
 #endif /* P2STREAM_H_ */

@@ -98,6 +98,8 @@ public:
 	virtual std::list<stream_full_cfg>::const_iterator streams_begin();
 	virtual std::list<stream_full_cfg>::const_iterator streams_end();
 
+	virtual IP2VeraStreamHub* find_stream_hub(std::string stream_name);
+
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
 private:

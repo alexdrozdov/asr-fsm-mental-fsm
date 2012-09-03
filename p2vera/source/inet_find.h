@@ -140,6 +140,7 @@ public:
 	virtual std::string get_cluster() = 0;                                      //Определить кластер приложений, в котором заерегистрировался экземляр класса
 
 	virtual int register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) = 0;         //Зарегистрировать новый поток сообщений, по которому возможно взаимодействие
+	virtual IP2VeraStreamHub* find_stream_hub(std::string stream_name) = 0;     //Поиск зарегистрированного потока по его имени
 };
 
 extern INetFind* net_find_create(net_find_config *nfc);

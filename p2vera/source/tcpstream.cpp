@@ -45,8 +45,7 @@ enum EBufProcessState {
 #define MAX_TCP_CONNECTIONS 100
 
 
-TcpStream::TcpStream(RemoteSrvUnit& rsu, int remote_port) {
-	cout << "TcpStream::TcpStream info - launched as master for remote server" << endl;
+TcpStream::TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
 	this->rsu = rsu;
 	this->remote_port = remote_port;
 
@@ -78,12 +77,13 @@ TcpStream::TcpStream(RemoteSrvUnit& rsu, int remote_port) {
 	cur_buf = new unsigned char[MAX_RCV_BUF];
 	pcur_buf = cur_buf;
 	cur_buf_usage = 0;
-	cout << "TcpStream::TcpStream info - completed as master, fd is " << fd << endl;
+	last_flow_id = 0;
+	net_find = nf;
 }
 
-TcpStream::TcpStream(int socket) {
-	cout << "TcpStream::TcpStream info - launched as slave for remote server" << endl;
+TcpStream::TcpStream(INetFind* nf, int socket) {
 	fd = socket;
+	fcntl(fd, F_SETFL, O_NONBLOCK);
 	remote_port = 0;
 
 	for (int i=0;i<256;i++) {
@@ -97,6 +97,8 @@ TcpStream::TcpStream(int socket) {
 	cur_buf = new unsigned char[MAX_RCV_BUF];
 	pcur_buf = cur_buf;
 	cur_buf_usage = 0;
+	last_flow_id = 0;
+	net_find = nf;
 }
 
 TcpStream::~TcpStream() {
@@ -117,6 +119,8 @@ void TcpStream::add_hub(IP2VeraStreamHub* p2h) {
 	flow_to_hub[last_flow_id] = p2h;
 	hub_to_flow[p2h] = last_flow_id;
 
+	p2h->add_tcp_stream(this);
+
 	//Формируем сообщение с названием потока и будущим идентификатором
 	tcp_wrapper tw;
 	msg_add_flow_rq* mafr = tw.mutable_add_flow_rq();
@@ -133,7 +137,7 @@ void TcpStream::add_hub(IP2VeraStreamHub* p2h) {
 void TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
 	if (NULL == p2h) return;
 	map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(p2h);
-	if (p2h_it != hub_to_flow.end()) {
+	if (p2h_it == hub_to_flow.end()) {
 		cout << "TcpStream::send_message - trying to send message to unregistered hub " << p2h->get_name() << endl;
 		return;
 	}
@@ -149,23 +153,22 @@ void TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
 	send_data(tw_str); //Отправка сформированного сообщения удаленному серверу
 }
 
-void TcpStream::receive_message() {
+bool TcpStream::receive_message() {
 	int ret = 0;
 	unsigned char buf[1024];
-	while( (ret = read(fd, buf, 1024))>0 ) {
-		cout << "TcpStream::receive_message info - ret=" << ret << endl;
+	while( (ret = recv(fd, buf, 1024, 0))>0 ) {
 		process_buffer(buf,ret);
 	}
+	if (0 == ret) {
+		cout << "TcpStream::receive_message error - read returned " << ret << endl;
+		return false;
+	}
+	return true;
 }
 
 
 int TcpStream::process_buffer(unsigned char* buf, int len) {
 	unsigned char* pbuf = buf;
-
-	for (int j=0;j<len;j++) {
-		cout << " 0x" << hex << (unsigned int)buf[j];
-	}
-	cout << endl;
 	int i = 0;
 	while (i<len) {
 		switch (buf_proc_state) {
@@ -267,18 +270,14 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 }
 
 bool TcpStream::send_data(std::string data) {
-	cout << "TcpStream::send_data info - sent some data" << endl;
 	//Определяем длину сообщения после его кодирования
 	int msg_len = 0;
-	cout << "TcpStream::send_data info - data.length()=" << data.length() << endl;
 	int data_len = data.length();
 	for (int i=0;i<data_len;i++) {
 		unsigned char c = (unsigned char)data[i];
 		msg_len += coded_length[c];
-		cout << (unsigned int)c << " " << coded_length[c] << endl;
 	}
 	msg_len += 4; // FRAME_START + CRC-16 + FRAME_END
-	cout << "TcpStream::send_data info - msg_len=" << msg_len << endl;
 
 	unsigned char *coded_msg = new unsigned char[msg_len];
 	unsigned char *pcoded_msg = coded_msg;
@@ -333,19 +332,32 @@ bool TcpStream::send_data(std::string data) {
 }
 
 int TcpStream::process_message(unsigned char* buf, int len) {
+	cout << "TcpStream::process_message info - launched" << endl;
 	tcp_wrapper wrpr;
 	if (!wrpr.ParseFromArray(buf, len)) {
 		cout << "TcpStream::process_message atacked - wrong message format" << endl;
 		return 1;
 	}
 	if (wrpr.has_add_flow_rq()) {
+		cout << "TcpStream::process_message info - add flow request received for flow " << wrpr.add_flow_rq().flow_name() << endl;
+		IP2VeraStreamHub* sh = net_find->find_stream_hub(wrpr.add_flow_rq().flow_name());
+		if (NULL!=sh) {
+			map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(sh); //FIXME Проверять, что добавляемые идентификаторы не были зарегистрированы ранее
+			if (p2h_it == hub_to_flow.end()) {
+				flow_to_hub[wrpr.add_flow_rq().flow_id()] = sh;
+				hub_to_flow[sh] = wrpr.add_flow_rq().flow_id();
+				sh->add_tcp_stream(this);
+			}
+		} else {
+			cout << "TcpStream::process_message warning - received request to create flow for unknown stream " << wrpr.add_flow_rq().flow_name() << endl;
+		}
 	}
 	if (wrpr.has_add_flow_rp()) {
 	}
 	for (int i=0;i<wrpr.tcp_flow_size();i++) {
 		const tcp_flow_wrapper& tfw = wrpr.tcp_flow(i);
 		map<int, IP2VeraStreamHub*>::iterator f2h_it = flow_to_hub.find(tfw.flow_id());
-		if (f2h_it != flow_to_hub.end()) {
+		if (f2h_it == flow_to_hub.end()) {
 			cout << "TcpStream::process_message warning - unknown flow with id " << tfw.flow_id() << endl;
 			continue;
 		}
@@ -363,7 +375,8 @@ int TcpStream::get_fd() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TcpStreamManager::TcpStreamManager(int start_port) {
+TcpStreamManager::TcpStreamManager(INetFind* nf, int start_port) {
+	net_find = nf;
 	pthread_mutex_init (&mtx, NULL);
 	sock_listen = socket(AF_INET, SOCK_STREAM, 0);
 	fcntl(sock_listen, F_SETFL, 0);
@@ -409,7 +422,7 @@ int TcpStreamManager::accept_thread() {
 			//уточнены, и тогда, возможно, он будет удален или преобразован в ведущий
 			pthread_mutex_lock(&mtx);
 			rsu_fd_item rfi;
-			rfi.tcp_stream = new TcpStream(sock);
+			rfi.tcp_stream = new TcpStream(net_find, sock);
 			rfi.fd = sock;
 			rsu_fd_list_modified = true;
 			rsu_fd_items.push_back(rfi);
@@ -454,7 +467,7 @@ void TcpStreamManager::add_server(RemoteSrvUnit& rsu, int remote_port) {
 	cout << "TcpStreamManager::add_server info - registering server " << rsu.get_uniq_id() << endl;
 	rsu_fd_item rfi;
 	rfi.rsu = rsu;
-	rfi.tcp_stream = new TcpStream(rsu, remote_port);
+	rfi.tcp_stream = new TcpStream(net_find, rsu, remote_port);
 	rfi.fd = rfi.tcp_stream->get_fd();
 
 	rsu_fd_list_modified = true;
@@ -513,7 +526,11 @@ void TcpStreamManager::rcv_thread() {
 			pfd[i].revents = 0;
 			for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
 				if (pfd[i].fd == it->fd) {
-					it->tcp_stream->receive_message();
+					if (! it->tcp_stream->receive_message()) { //При приеме сообщения произошел неизвестный сбой и теперь сервер должен быть удален из списка
+						cout << "TcpStreamManager::rcv_thread info - remote socket failed, removing it from poll list" << endl;
+						it = rsu_fd_items.erase(it);
+						rsu_fd_list_modified = true;
+					}
 				}
 			}
 		}

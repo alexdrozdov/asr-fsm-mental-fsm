@@ -82,7 +82,7 @@ NetFind::NetFind(net_find_config *nfc) {
 	msg_handlers[1] = info_handler;
 	msg_handlers[2] = list_handler;
 
-	tcm = new TcpStreamManager(8000);
+	tcm = new TcpStreamManager(this, 8000);
 
 	//Создаем потоки
 	pthread_t thread_id;
@@ -266,6 +266,12 @@ std::list<stream_full_cfg>::iterator NetFind::find_stream(std::string name) {
 		if (it->stream_cfg.name == name) return it;
 	}
 	return streams.end();
+}
+
+IP2VeraStreamHub* NetFind::find_stream_hub(std::string stream_name) {
+	std::list<stream_full_cfg>::iterator it = find_stream(stream_name);
+	if (streams.end()==it) return NULL;
+	return it->sh;
 }
 
 
@@ -586,9 +592,9 @@ void NetFind::invoke_requests() {
 	}
 
 	//При необходимости собираем информацию о других серверах, работающих на этом хосте
-	//if (list_handler->requires_server_list()) {
-	//	list_handler->RequestLocalhost();
-	//}
+	if (list_handler->requires_server_list()) {
+		list_handler->RequestLocalhost();
+	}
 }
 
 //Подготовить сервер к удалению. Сервер должен быть перемещен в список

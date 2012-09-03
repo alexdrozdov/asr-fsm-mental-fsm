@@ -28,18 +28,19 @@ void* tcp_poll_thread_fcn (void* thread_arg);
 //Класс создается при обнаружение удаленного сервера, имеющего общие каналы
 class TcpStream {
 public:
-	TcpStream(RemoteSrvUnit& rsu, int remote_port);
-	TcpStream(int socket);
+	TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port);
+	TcpStream(INetFind* nf, int socket);
 	virtual ~TcpStream();
 	virtual void add_hub(IP2VeraStreamHub* p2h); //Добавление потока по его идентификатору
 	virtual void send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h); //Передача сообщения от лица указанного хаба. Сообщение будет смаршрутизировано в нужный поток
-	virtual void receive_message();
+	virtual bool receive_message();
 	virtual int get_fd();
 private:
 	int process_buffer(unsigned char* buf, int len);
 	int process_message(unsigned char* buf, int len);
 	bool send_data(std::string data);          //Упаковка данных в стартовый и стоповый байты и передача по сети
 	RemoteSrvUnit rsu;
+	INetFind* net_find;
 	int remote_port;
 	int fd;
 	int last_flow_id;
@@ -65,7 +66,7 @@ struct rsu_fd_item {
 //этого класса, также класс обрабатывает входящие запросы на соединение от других серверов
 class TcpStreamManager {
 public:
-	TcpStreamManager(int start_port);
+	TcpStreamManager(INetFind* nf, int start_port);
 	void add_server(RemoteSrvUnit& rsu, int remote_port); //Добавить удаленный сервер и попытаться установить с ним соединение
 	void remove_server(RemoteSrvUnit& rsu);
 	int get_fd();
@@ -79,6 +80,7 @@ public:
 private:
 	void rcv_thread();
 	int accept_thread();
+	INetFind* net_find;
 	std::list<rsu_fd_item> rsu_fd_items; //Список удаленных серверов и их файловых дескрипторов, на которые необходимо получать данные
 	int last_rsu_fd_count;
 	bool rsu_fd_list_modified; //Признак того, что список серверов был изменен. Требуется перестроить список poll_fd
