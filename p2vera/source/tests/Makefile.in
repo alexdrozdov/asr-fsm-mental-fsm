@@ -42,10 +42,16 @@ install.gnulinux: FORCE
 install.macos: FORCE
 	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_netfind)
 	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_netfind)
+	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
 	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_hub)
 	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_hub)
-	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
 	@cp $(BUILD_DIR)/$(trg_hub) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_p2vera)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_p2vera)
+	@cp $(BUILD_DIR)/$(trg_p2vera) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_rcv_p2vera)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_rcv_p2vera)
+	@cp $(BUILD_DIR)/$(trg_rcv_p2vera) ../../bin/
 	@echo Done
 
 dirs: FORCE

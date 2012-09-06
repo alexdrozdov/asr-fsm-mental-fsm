@@ -49,6 +49,7 @@ TcpStream::TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
 	this->rsu = rsu;
 	this->remote_port = remote_port;
 
+	opened = false;
 	for (int i=0;i<256;i++) {
 		coded_length[i] = 1;
 	}
@@ -72,6 +73,7 @@ TcpStream::TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
 		cout << strerror(errno) << endl;
 		return;
 	}
+	opened = true;
 
 	buf_proc_state = 0;
 	cur_buf = new unsigned char[MAX_RCV_BUF];
@@ -99,6 +101,7 @@ TcpStream::TcpStream(INetFind* nf, int socket) {
 	cur_buf_usage = 0;
 	last_flow_id = 0;
 	net_find = nf;
+	opened = true;
 }
 
 TcpStream::~TcpStream() {
@@ -134,12 +137,16 @@ void TcpStream::add_hub(IP2VeraStreamHub* p2h) {
 
 
 
-void TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
-	if (NULL == p2h) return;
+bool TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
+	if (NULL == p2h) return false;
+	if (!opened) {
+		cout << "TcpStream::send_message info - connection is closed" << endl;
+		return false;
+	}
 	map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(p2h);
 	if (p2h_it == hub_to_flow.end()) {
 		cout << "TcpStream::send_message - trying to send message to unregistered hub " << p2h->get_name() << endl;
-		return;
+		return false;
 	}
 	int flow_id = p2h_it->second;
 	tcp_wrapper tw;
@@ -151,6 +158,7 @@ void TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
 	string tw_str;
 	tw.SerializeToString(&tw_str);
 	send_data(tw_str); //Отправка сформированного сообщения удаленному серверу
+	return true;
 }
 
 bool TcpStream::receive_message() {
@@ -326,6 +334,8 @@ bool TcpStream::send_data(std::string data) {
 			cout << strerror(errno) << endl;
 			//exit(3); //FIXME Выходить здесь не надо. Надо повторно установить соединение
 		}
+		opened = false;
+		return false;
 	}
 
 	return true;

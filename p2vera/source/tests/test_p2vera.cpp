@@ -6,10 +6,12 @@
  */
 
 
+#include <signal.h>
 #include "p2vera.h"
 #include "p2message.h"
 
 int main(int argc, char* argv[]) {
+	signal(SIGPIPE, SIG_IGN);
 	P2Vera* p2v = new P2Vera();
 
 	stream_config stream_cfg;

@@ -6,6 +6,7 @@
  */
 
 #include <stdlib.h>
+#include <signal.h>
 
 #include <iostream>
 #include <list>
@@ -17,6 +18,7 @@
 using namespace std;
 
 int main(int argc, char *argv[]) {
+	signal(SIGPIPE, SIG_IGN);
 	P2Vera* p2v = new P2Vera();
 	net_find_config nfc;
 	nfc.nf_caption = "NetFind test";

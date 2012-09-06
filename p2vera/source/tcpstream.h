@@ -32,7 +32,7 @@ public:
 	TcpStream(INetFind* nf, int socket);
 	virtual ~TcpStream();
 	virtual void add_hub(IP2VeraStreamHub* p2h); //Добавление потока по его идентификатору
-	virtual void send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h); //Передача сообщения от лица указанного хаба. Сообщение будет смаршрутизировано в нужный поток
+	virtual bool send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h); //Передача сообщения от лица указанного хаба. Сообщение будет смаршрутизировано в нужный поток
 	virtual bool receive_message();
 	virtual int get_fd();
 private:
@@ -44,6 +44,7 @@ private:
 	int remote_port;
 	int fd;
 	int last_flow_id;
+	bool opened;
 
 	std::map<int, IP2VeraStreamHub*> flow_to_hub;
 	std::map<IP2VeraStreamHub*, int> hub_to_flow;

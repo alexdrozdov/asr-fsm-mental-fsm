@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/poll.h>
+#include <signal.h>
 
 #include <iostream>
 #include <list>
@@ -29,6 +30,7 @@ typedef struct _listner_task {
 } listner_task;
 
 int main(int argc, char *argv[]) {
+	signal(SIGPIPE, SIG_IGN);
 	P2VeraStreamHub sh("sound");
 	P2VeraStream vs = sh.create_outstream();
 	for (int i=0;i<5;i++) {

@@ -24,6 +24,7 @@ void* rcv_thread_fcn (void* thread_arg);
 class P2Vera {
 public:
 	P2Vera();
+	virtual ~P2Vera();
 	virtual void register_stream(stream_config& stream_cfg);  //Регистрация потока. Все потоки должны быть зарегистрированы до начала сетевого обмена
 	virtual void start_network();                             //Запуск сетевого взаимодействия. Любые настройки после запуска обмена становятся бесполезными
 	virtual P2VeraStream create_stream(std::string name);     //Создание двунаправленного потока обмена

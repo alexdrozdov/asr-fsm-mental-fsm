@@ -6,6 +6,7 @@
  */
 
 #include <sys/poll.h>
+#include <signal.h>
 
 #include <iostream>
 #include <string>
@@ -88,6 +89,7 @@ int opt_stream_handler(char opt_name, char* popt_val) {
 
 
 int main(int argc, const char *argv[]) {
+	signal(SIGPIPE, SIG_IGN);
 	fill_option_handlers();
 	parse_options(argc, argv);
 	if (run_options.show_version) {

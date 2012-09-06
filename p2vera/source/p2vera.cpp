@@ -52,6 +52,9 @@ P2Vera::P2Vera() {
 	}
 }
 
+P2Vera::~P2Vera() {
+}
+
 void P2Vera::register_stream(stream_config& stream_cfg) {
 	pthread_mutex_lock(&mtx);
 	if (networking_active) {
@@ -168,7 +171,7 @@ void P2Vera::create_netfind() {
 	nfc.nf_cluster = "netfind-test-cluster";
 	nf = net_find_create(&nfc);
 	nf->add_scanable_server("127.0.0.1", "7300");
-	nf->add_broadcast_servers("7300");
+	//nf->add_broadcast_servers("7300");
 }
 
 void P2Vera::generate_uniq_id() {
