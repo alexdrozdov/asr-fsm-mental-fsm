@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 
 	stream_config stream_cfg;
 	stream_cfg.name = "base";
-	stream_cfg.direction = stream_direction_bidir;
+	stream_cfg.direction = stream_direction_outcome;
 	stream_cfg.order = stream_msg_order_any;
 	stream_cfg.type = stream_type_dgram;
 	p2v->register_stream(stream_cfg);

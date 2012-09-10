@@ -4,6 +4,7 @@
 [local_server]
 name = "p2v_rcv"
 caption = "P2Vera Message Listener"
+claster = "default"
 hash = ""
 server_port = 7300
 min_client_port = 7301

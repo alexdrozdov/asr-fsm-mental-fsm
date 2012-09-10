@@ -455,6 +455,7 @@ bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		rnfs->update_info(&nfc);
 		for (int i=0;i<mirs.channels_size();i++) {
 			const p2v_channel& p2vc = mirs.channels(i);
+			if (p2v_channel_endpoint_mode_transmitter == p2vc.ep_mode()) continue; //Удаленный абонент является источником сообщений и сам их не принимает. Регистрировать его не надо. При необходимости он сам к нам обратится
 			remote_endpoint re;
 			re.remote_port = p2vc.port();
 			switch (p2vc.ch_integrity()) { //В зависимости от заявленной надежности каналу устанавливаем способ доставки данных до конечной точки

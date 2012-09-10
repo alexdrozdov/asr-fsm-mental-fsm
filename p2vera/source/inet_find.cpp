@@ -58,10 +58,12 @@ bool RemoteSrvUnit::is_localhost() {
 }
 
 bool RemoteSrvUnit::is_self() {
+	if (!irnfs) return false;
 	return irnfs->is_self();
 }
 
 std::string RemoteSrvUnit::get_uniq_id() {
+	if (!irnfs) return "";
 	return irnfs->get_uniq_id();
 }
 

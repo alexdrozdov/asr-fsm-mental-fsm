@@ -26,20 +26,27 @@ void* tcp_poll_thread_fcn (void* thread_arg);
 //Класс обеспечивает передачу данных по протоколу Tcp между двумя серверами.
 //В один Tcp-канал мультиплексируются все потоки, которыми могут обмениваться сервера
 //Класс создается при обнаружение удаленного сервера, имеющего общие каналы
-class TcpStream {
+class TcpStreamConnection {
 public:
-	TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port);
-	TcpStream(INetFind* nf, int socket);
-	virtual ~TcpStream();
+	TcpStreamConnection(INetFind* nf, RemoteSrvUnit& rsu, int remote_port);
+	TcpStreamConnection(INetFind* nf, int socket);
+	virtual ~TcpStreamConnection();
 	virtual void add_hub(IP2VeraStreamHub* p2h); //Добавление потока по его идентификатору
 	virtual bool send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h); //Передача сообщения от лица указанного хаба. Сообщение будет смаршрутизировано в нужный поток
 	virtual bool receive_message();
 	virtual int get_fd();
+	virtual bool compare_remote_server(RemoteSrvUnit& rsu);
+	virtual void unlink_stream_hubs();
+
+	virtual bool increase_ref_count(); //Увеличивает счетчик ссылок на экземпляр класса
+	virtual int decrease_ref_count();  //Уменьшает счетчик ссылок на экземпляр класса
+	virtual bool is_referenced();      //Позволяет проверить наличие ссылок на экземпляр и возможность его удаления
 private:
 	int process_buffer(unsigned char* buf, int len);
 	int process_message(unsigned char* buf, int len);
 	bool send_data(std::string data);          //Упаковка данных в стартовый и стоповый байты и передача по сети
 	RemoteSrvUnit rsu;
+	bool rsu_valid;
 	INetFind* net_find;
 	int remote_port;
 	int fd;
@@ -55,11 +62,37 @@ private:
 	int cur_buf_usage; //Количество использованных ячеек буфера
 
 	int coded_length[256];
+
+	pthread_mutex_t mtx;
+	int ref_count;
 };
+
+class TcpStream {
+public:
+	TcpStream();
+	TcpStream(TcpStreamConnection *itm);
+	TcpStream(const TcpStream& original);
+	~TcpStream();
+	TcpStream& operator=(const TcpStream& original);
+	TcpStream& operator=(TcpStreamConnection *itm);
+
+	void add_hub(IP2VeraStreamHub* p2h); //Добавление потока по его идентификатору
+	bool send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h); //Передача сообщения от лица указанного хаба. Сообщение будет смаршрутизировано в нужный поток
+	bool receive_message();
+	int get_fd();
+	bool compare_remote_server(RemoteSrvUnit& rsu);
+	void unlink_stream_hubs();
+
+	friend bool operator==(const TcpStream& lh, const TcpStream& rh);
+private:
+	TcpStreamConnection *tsc;
+};
+
+bool operator==(const TcpStream& lh, const TcpStream& rh);
 
 struct rsu_fd_item {
 	RemoteSrvUnit rsu;
-	TcpStream *tcp_stream;
+	TcpStream tcp_stream;
 	int fd;
 };
 
@@ -73,7 +106,7 @@ public:
 	int get_fd();
 	int get_port();
 
-	TcpStream* find_stream(RemoteSrvUnit rsu);
+	TcpStream find_stream(RemoteSrvUnit rsu);
 
 	friend void* tcp_accept_thread_fcn (void* thread_arg);
 	friend void* tcp_poll_thread_fcn (void* thread_arg);

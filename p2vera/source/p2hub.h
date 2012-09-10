@@ -40,12 +40,12 @@ public:
 	virtual bool receive_message(IP2VeraMessage& p2m);     //Принимает сообщение из сети и раздает ее по очередям
 	virtual bool add_message_target(RemoteSrvUnit rsu, int port);    //Добавляет удаленный сервер, который нуждается в получении сообщений от этого хаба
 	virtual bool remove_message_target(RemoteSrvUnit rsu); //Удаляет сервер. Хаб должен прекратить передачу сообщений этому серверу
-	virtual bool add_tcp_stream(TcpStream* tcs);
+	virtual bool add_tcp_stream(TcpStream tcs);
 private:
 	pthread_mutex_t mtx;
 	int snd_sock;
 	std::list<P2VeraStream> qqs;
-	std::list<TcpStream*> tcsl;
+	std::list<TcpStream> tcsl;
 	std::list<remote_hub> remote_hubs;
 	std::string name;
 };

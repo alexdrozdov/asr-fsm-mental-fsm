@@ -45,11 +45,13 @@ enum EBufProcessState {
 #define MAX_TCP_CONNECTIONS 100
 
 
-TcpStream::TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
+TcpStreamConnection::TcpStreamConnection(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
 	this->rsu = rsu;
 	this->remote_port = remote_port;
 
 	opened = false;
+	ref_count = 1;
+	rsu_valid = true; //При создании этого соединения параметр rsu был задан явно - значит им можно пользоваться
 	for (int i=0;i<256;i++) {
 		coded_length[i] = 1;
 	}
@@ -60,7 +62,7 @@ TcpStream::TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	fcntl(fd, F_SETFL, 0);
 	if(fd < 0) {
-		cout << "TcpStream::TcpStream error - failed to create socket" << endl;
+		cout << "TcpStreamConnection::TcpStreamConnection error - failed to create socket" << endl;
 		return;
 	}
 
@@ -69,7 +71,7 @@ TcpStream::TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
 	addr.sin_port = htons(remote_port);
 
 	if (connect(fd, (struct sockaddr *)&addr, sizeof(sockaddr_in)) < 0) {
-		cout << "TcpStream::TcpStream error - couldn`t connect to remote host " << rsu.get_uniq_id() << endl;
+		cout << "TcpStreamConnection::TcpStreamConnection error - couldn`t connect to remote host " << rsu.get_uniq_id() << endl;
 		cout << strerror(errno) << endl;
 		return;
 	}
@@ -83,10 +85,12 @@ TcpStream::TcpStream(INetFind* nf, RemoteSrvUnit& rsu, int remote_port) {
 	net_find = nf;
 }
 
-TcpStream::TcpStream(INetFind* nf, int socket) {
+TcpStreamConnection::TcpStreamConnection(INetFind* nf, int socket) {
 	fd = socket;
 	fcntl(fd, F_SETFL, O_NONBLOCK);
 	remote_port = 0;
+	ref_count = 1;
+	rsu_valid = false; //Параметр rsu не известен и должен быть определен на основании входящих сообщений
 
 	for (int i=0;i<256;i++) {
 		coded_length[i] = 1;
@@ -104,30 +108,36 @@ TcpStream::TcpStream(INetFind* nf, int socket) {
 	opened = true;
 }
 
-TcpStream::~TcpStream() {
+TcpStreamConnection::~TcpStreamConnection() {
+	close(fd);
 	delete[] cur_buf;
 }
 
-void TcpStream::add_hub(IP2VeraStreamHub* p2h) {
+void TcpStreamConnection::add_hub(IP2VeraStreamHub* p2h) {
 	if (NULL == p2h) {
-		cout << "TcpStream::add_hub error - zero pointer to hub" << endl;
+		cout << "TcpStreamConnection::add_hub error - zero pointer to hub" << endl;
+		return;
+	}
+	if (!rsu_valid) {
+		cout << "TcpStreamConnection::add_hub error - remote server is undefined" << endl;
 		return;
 	}
 	last_flow_id++;
 	map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(p2h);
 	if (p2h_it != hub_to_flow.end()) {
-		cout << "TcpStream::add_hub warning - hub was already registered" << endl;
+		cout << "TcpStreamConnection::add_hub warning - hub was already registered" << endl;
 		return;
 	}
 	flow_to_hub[last_flow_id] = p2h;
 	hub_to_flow[p2h] = last_flow_id;
 
-	p2h->add_tcp_stream(this);
+	TcpStream ts(this);
+	p2h->add_tcp_stream(ts);
 
 	//Формируем сообщение с названием потока и будущим идентификатором
 	tcp_wrapper tw;
 	msg_add_flow_rq* mafr = tw.mutable_add_flow_rq();
-	mafr->set_rq_cookie_id("");
+	mafr->set_rq_cookie_id(net_find->get_uniq_id());
 	mafr->set_flow_name(p2h->get_name());
 	mafr->set_flow_id(last_flow_id);
 	string tw_str;
@@ -135,17 +145,26 @@ void TcpStream::add_hub(IP2VeraStreamHub* p2h) {
 	send_data(tw_str); //Отправка сформированного сообщения на создание потока удаленному серверу
 }
 
+void TcpStreamConnection::unlink_stream_hubs() {
+	for (map<IP2VeraStreamHub*, int>::iterator p2h_it=hub_to_flow.begin();p2h_it!=hub_to_flow.end();p2h_it++) {
+		IP2VeraStreamHub* p2h = const_cast<IP2VeraStreamHub*>(p2h_it->first);
+		p2h->remove_message_target(rsu);
+	}
+	hub_to_flow.clear();
+	flow_to_hub.clear();
+}
 
 
-bool TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
+
+bool TcpStreamConnection::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
 	if (NULL == p2h) return false;
 	if (!opened) {
-		cout << "TcpStream::send_message info - connection is closed" << endl;
+		cout << "TcpStreamConnection::send_message info - connection is closed" << endl;
 		return false;
 	}
 	map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(p2h);
 	if (p2h_it == hub_to_flow.end()) {
-		cout << "TcpStream::send_message - trying to send message to unregistered hub " << p2h->get_name() << endl;
+		cout << "TcpStreamConnection::send_message - trying to send message to unregistered hub " << p2h->get_name() << endl;
 		return false;
 	}
 	int flow_id = p2h_it->second;
@@ -161,21 +180,21 @@ bool TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
 	return true;
 }
 
-bool TcpStream::receive_message() {
+bool TcpStreamConnection::receive_message() {
 	int ret = 0;
 	unsigned char buf[1024];
 	while( (ret = recv(fd, buf, 1024, 0))>0 ) {
 		process_buffer(buf,ret);
 	}
 	if (0 == ret) {
-		cout << "TcpStream::receive_message error - read returned " << ret << endl;
+		cout << "TcpStreamConnection::receive_message error - read returned " << ret << endl;
 		return false;
 	}
 	return true;
 }
 
 
-int TcpStream::process_buffer(unsigned char* buf, int len) {
+int TcpStreamConnection::process_buffer(unsigned char* buf, int len) {
 	unsigned char* pbuf = buf;
 	int i = 0;
 	while (i<len) {
@@ -210,7 +229,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 					buf_proc_state = bps_escape;
 					break;
 				} else if (FRAME_START == *pbuf) {
-					cout << "TcpStream::process_buffer atacked - frame start in message body" << endl;
+					cout << "TcpStreamConnection::process_buffer atacked - frame start in message body" << endl;
 
 					cout << "Position " << i << endl;
 
@@ -224,7 +243,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 						//Фрейм имеет правильную струткуру, но содержит менее 8 байт
 						//В нем гарантированно отсутствует контрольная сумма
 						//Проверить правильность данных в этом буфере невозможно
-						cout << "TcpStream::process_buffer atacked - frame is too short to be valid" << endl;
+						cout << "TcpStreamConnection::process_buffer atacked - frame is too short to be valid" << endl;
 						exit(4);
 					}
 					process_message(cur_buf,cur_buf_usage-2); //- CRC-16 length
@@ -239,7 +258,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 				i++;
 				pbuf++;
 				if (MAX_RCV_BUF <= cur_buf_usage) {
-					cout << "TcpStream::process_buffer atacked - frame length overflow" << endl;
+					cout << "TcpStreamConnection::process_buffer atacked - frame length overflow" << endl;
 					cout << "Will now exit" << endl;
 					exit(4);
 				}
@@ -255,7 +274,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 					} else if (FRAME_ESCAPE == *pbuf) {
 						c = FRAME_ESCAPE;
 					} else {
-						cout << "TcpStream::process_buffer atacked - unknown escape symbol" << endl;
+						cout << "TcpStreamConnection::process_buffer atacked - unknown escape symbol" << endl;
 						cout << "Will now exit" << endl;
 						exit(4);
 					}
@@ -266,7 +285,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 					pbuf++;
 					buf_proc_state = bps_body;
 					if (MAX_RCV_BUF <= cur_buf_usage) {
-						cout << "TcpStream::process_buffer atacked - frame length overflow" << endl;
+						cout << "TcpStreamConnection::process_buffer atacked - frame length overflow" << endl;
 						cout << "Will now exit" << endl;
 						exit(4);
 					}
@@ -277,7 +296,7 @@ int TcpStream::process_buffer(unsigned char* buf, int len) {
 	return 0;
 }
 
-bool TcpStream::send_data(std::string data) {
+bool TcpStreamConnection::send_data(std::string data) {
 	//Определяем длину сообщения после его кодирования
 	int msg_len = 0;
 	int data_len = data.length();
@@ -328,9 +347,9 @@ bool TcpStream::send_data(std::string data) {
 	delete[] coded_msg;
 	if (-1 == send_res) {
 		if (EAGAIN == errno) {
-			cout << "TcpStream::send_data error - socket overflow" << endl;
+			cout << "TcpStreamConnection::send_data error - socket overflow" << endl;
 		} else {
-			cout << "TcpStream::send_data error - " << errno << endl;
+			cout << "TcpStreamConnection::send_data error - " << errno << endl;
 			cout << strerror(errno) << endl;
 			//exit(3); //FIXME Выходить здесь не надо. Надо повторно установить соединение
 		}
@@ -341,25 +360,38 @@ bool TcpStream::send_data(std::string data) {
 	return true;
 }
 
-int TcpStream::process_message(unsigned char* buf, int len) {
-	cout << "TcpStream::process_message info - launched" << endl;
+int TcpStreamConnection::process_message(unsigned char* buf, int len) {
 	tcp_wrapper wrpr;
 	if (!wrpr.ParseFromArray(buf, len)) {
-		cout << "TcpStream::process_message atacked - wrong message format" << endl;
+		cout << "TcpStreamConnection::process_message atacked - wrong message format" << endl;
 		return 1;
 	}
 	if (wrpr.has_add_flow_rq()) {
-		cout << "TcpStream::process_message info - add flow request received for flow " << wrpr.add_flow_rq().flow_name() << endl;
-		IP2VeraStreamHub* sh = net_find->find_stream_hub(wrpr.add_flow_rq().flow_name());
-		if (NULL!=sh) {
-			map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(sh); //FIXME Проверять, что добавляемые идентификаторы не были зарегистрированы ранее
-			if (p2h_it == hub_to_flow.end()) {
-				flow_to_hub[wrpr.add_flow_rq().flow_id()] = sh;
-				hub_to_flow[sh] = wrpr.add_flow_rq().flow_id();
-				sh->add_tcp_stream(this);
+		cout << "TcpStreamConnection::process_message info - add flow request received for flow " << wrpr.add_flow_rq().flow_name() << " from " << wrpr.add_flow_rq().rq_cookie_id() << endl;
+		try {
+			//Ищем сервер в списке ранее обнаруженных серверов по его идентификатору
+			RemoteSrvUnit received_rsu = net_find->get_by_uniq_id(wrpr.add_flow_rq().rq_cookie_id());
+			if (!rsu_valid) { //Если ранее сервер не был определен, задаем его
+				rsu = received_rsu;
+				rsu_valid = true;
+			} else if (rsu != received_rsu) {
+				cout << "TcpStreamConnection::process_message warning - id for server " << rsu.get_uniq_id() << " was changed to " << received_rsu.get_uniq_id() << endl;
+				return 1; //FIXME Сообщение на добавление потока должно обрабатываться отдельной функцией и в этой ситуации приводить к завершению только этой функции
 			}
-		} else {
-			cout << "TcpStream::process_message warning - received request to create flow for unknown stream " << wrpr.add_flow_rq().flow_name() << endl;
+			IP2VeraStreamHub* sh = net_find->find_stream_hub(wrpr.add_flow_rq().flow_name());
+			if (NULL!=sh) {
+				map<IP2VeraStreamHub*, int>::iterator p2h_it = hub_to_flow.find(sh); //FIXME Проверять, что добавляемые идентификаторы не были зарегистрированы ранее
+				if (p2h_it == hub_to_flow.end()) {
+					flow_to_hub[wrpr.add_flow_rq().flow_id()] = sh;
+					hub_to_flow[sh] = wrpr.add_flow_rq().flow_id();
+					TcpStream ts(this);
+					sh->add_tcp_stream(ts);
+				}
+			} else {
+				cout << "TcpStreamConnection::process_message warning - received request to create flow for unknown stream " << wrpr.add_flow_rq().flow_name() << endl;
+			}
+		} catch (server_not_found&) {
+			cout << "TcpStreamConnection::process_message error - connection from unknown server " << wrpr.add_flow_rq().rq_cookie_id() << endl;
 		}
 	}
 	if (wrpr.has_add_flow_rp()) {
@@ -368,7 +400,7 @@ int TcpStream::process_message(unsigned char* buf, int len) {
 		const tcp_flow_wrapper& tfw = wrpr.tcp_flow(i);
 		map<int, IP2VeraStreamHub*>::iterator f2h_it = flow_to_hub.find(tfw.flow_id());
 		if (f2h_it == flow_to_hub.end()) {
-			cout << "TcpStream::process_message warning - unknown flow with id " << tfw.flow_id() << endl;
+			cout << "TcpStreamConnection::process_message warning - unknown flow with id " << tfw.flow_id() << endl;
 			continue;
 		}
 		IP2VeraStreamHub* p2vh = f2h_it->second;
@@ -378,10 +410,37 @@ int TcpStream::process_message(unsigned char* buf, int len) {
 	return 0;
 }
 
-int TcpStream::get_fd() {
+int TcpStreamConnection::get_fd() {
 	return fd;
 }
 
+bool TcpStreamConnection::compare_remote_server(RemoteSrvUnit& rsu) {
+	return (rsu==this->rsu);
+}
+
+
+bool TcpStreamConnection::increase_ref_count() {
+	pthread_mutex_lock(&mtx);
+	bool succed = (ref_count > 0);
+	if (ref_count > 0) ref_count++;
+	pthread_mutex_unlock(&mtx);
+	return succed;
+}
+
+int TcpStreamConnection::decrease_ref_count() {
+	int tmp = 0;
+	pthread_mutex_lock(&mtx);
+	ref_count--;
+	tmp = ref_count;
+	pthread_mutex_unlock(&mtx);
+	return tmp;
+}
+
+bool TcpStreamConnection::is_referenced() {
+	//cout << "RemoteNfServer::is_referenced - ref count " << ref_count << endl;
+	if (ref_count > 0) return true;
+	return false;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -432,7 +491,7 @@ int TcpStreamManager::accept_thread() {
 			//уточнены, и тогда, возможно, он будет удален или преобразован в ведущий
 			pthread_mutex_lock(&mtx);
 			rsu_fd_item rfi;
-			rfi.tcp_stream = new TcpStream(net_find, sock);
+			rfi.tcp_stream = TcpStream(new TcpStreamConnection(net_find, sock));
 			rfi.fd = sock;
 			rsu_fd_list_modified = true;
 			rsu_fd_items.push_back(rfi);
@@ -451,8 +510,8 @@ int TcpStreamManager::accept_thread() {
 	return 0;
 }
 
-TcpStream* TcpStreamManager::find_stream(RemoteSrvUnit rsu) {
-	TcpStream* tc = NULL;
+TcpStream TcpStreamManager::find_stream(RemoteSrvUnit rsu) {
+	TcpStream tc(NULL);
 	pthread_mutex_lock(&mtx);
 	for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
 		if (rsu == it->rsu) {
@@ -477,8 +536,9 @@ void TcpStreamManager::add_server(RemoteSrvUnit& rsu, int remote_port) {
 	cout << "TcpStreamManager::add_server info - registering server " << rsu.get_uniq_id() << endl;
 	rsu_fd_item rfi;
 	rfi.rsu = rsu;
-	rfi.tcp_stream = new TcpStream(net_find, rsu, remote_port);
-	rfi.fd = rfi.tcp_stream->get_fd();
+	TcpStreamConnection *tsc = new TcpStreamConnection(net_find, rsu, remote_port);
+	rfi.tcp_stream = TcpStream(tsc);
+	rfi.fd = rfi.tcp_stream.get_fd();
 
 	rsu_fd_list_modified = true;
 	rsu_fd_items.push_back(rfi);
@@ -487,6 +547,13 @@ void TcpStreamManager::add_server(RemoteSrvUnit& rsu, int remote_port) {
 
 void TcpStreamManager::remove_server(RemoteSrvUnit& rsu) {
 	pthread_mutex_lock(&mtx);
+	for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
+		if (rsu != it->rsu) continue;
+		it = rsu_fd_items.erase(it);
+		rsu_fd_list_modified = true;
+		pthread_mutex_unlock(&mtx);
+		return;
+	}
 	pthread_mutex_unlock(&mtx);
 }
 
@@ -532,12 +599,12 @@ void TcpStreamManager::rcv_thread() {
 		pthread_mutex_lock(&mtx);
 		for (int i=0;i<last_rsu_fd_count;i++) {
 			if (0==pfd[i].revents) continue;
-			cout << "TcpStreamManager::rcv_thread info - received some tcp message " << i << " " << pfd[i].revents << endl;
 			pfd[i].revents = 0;
 			for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
 				if (pfd[i].fd == it->fd) {
-					if (! it->tcp_stream->receive_message()) { //При приеме сообщения произошел неизвестный сбой и теперь сервер должен быть удален из списка
+					if (! it->tcp_stream.receive_message()) { //При приеме сообщения произошел неизвестный сбой и теперь сервер должен быть удален из списка
 						cout << "TcpStreamManager::rcv_thread info - remote socket failed, removing it from poll list" << endl;
+						it->tcp_stream.unlink_stream_hubs(); //Отсоединяем все связанные хабы. Чтобы больше ничего не слали
 						it = rsu_fd_items.erase(it);
 						rsu_fd_list_modified = true;
 					}
@@ -564,4 +631,78 @@ void* tcp_poll_thread_fcn (void* thread_arg) {
 }
 
 
+////////////////////////////////////////////////////////
 
+TcpStream::TcpStream(TcpStreamConnection *itm) {
+	if (NULL == itm) {
+		cout << "TcpStream::TcpStream error - null pointer to remote server interface" << endl;
+		return;
+	}
+	tsc = itm;
+	tsc->increase_ref_count(); //Сообщаем объекту, что он уже используется
+	if (!tsc->is_referenced()) {
+		cout << "TcpStream::TcpStream error - couldnt create wrapper for TcpStreamConnection. Connection was already unlinked" << endl;
+	}
+}
+
+TcpStream::TcpStream() {
+	tsc = NULL;
+}
+
+TcpStream::TcpStream(const TcpStream& original) {
+	tsc = original.tsc;
+	if (tsc) tsc->increase_ref_count();
+}
+
+TcpStream::~TcpStream() {
+	if (!tsc) return;
+	if (0 == tsc->decrease_ref_count()) { //Больше на этот объект ссылок не осталось. Удаляем его.
+		delete tsc;
+	}
+}
+
+TcpStream& TcpStream::operator=(const TcpStream& original) {
+	tsc = original.tsc;
+	if (tsc) tsc->increase_ref_count();
+	return *this;
+}
+
+TcpStream& TcpStream::operator=(TcpStreamConnection* itm) {
+	tsc = itm;
+	if (tsc) tsc->increase_ref_count();
+	return *this;
+}
+
+bool operator==(const TcpStream& lh, const TcpStream& rh) {
+	return (lh.tsc == rh.tsc);
+}
+
+void TcpStream::add_hub(IP2VeraStreamHub* p2h) {
+	if (NULL == tsc) return;
+	tsc->add_hub(p2h);
+}
+
+bool TcpStream::send_message(IP2VeraMessage& p2m, IP2VeraStreamHub* p2h) {
+	if (NULL == tsc) return false;
+	return tsc->send_message(p2m, p2h);
+}
+
+bool TcpStream::receive_message() {
+	if (NULL == tsc) return false;
+	return tsc->receive_message();
+}
+
+int TcpStream::get_fd() {
+	if (NULL == tsc) return 0;
+	return tsc->get_fd();
+}
+
+bool TcpStream::compare_remote_server(RemoteSrvUnit& rsu) {
+	if (NULL == tsc) return false;
+	return tsc->compare_remote_server(rsu);
+}
+
+void TcpStream::unlink_stream_hubs() {
+	if (NULL == tsc) return;
+	tsc->unlink_stream_hubs();
+}

@@ -229,9 +229,9 @@ void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint&
 		}
 
 		tcm->add_server(re.rsu, re.remote_port);  //Добавляем вновь найденный сервер (при его отсутствии)
-		TcpStream* tc = tcm->find_stream(re.rsu); //Ищем вновь созданный поток
+		TcpStream tc = tcm->find_stream(re.rsu); //Ищем вновь созданный поток
 		//FIXME Сервер может оказаться недоступным. Проверять возвращенное значение
-		tc->add_hub(it->sh); //Добавляем хаб с указанным именем к списку хабов, связанных с этим сервером
+		tc.add_hub(it->sh); //Добавляем хаб с указанным именем к списку хабов, связанных с этим сервером
 		pthread_mutex_unlock(&mtx);
 	}
 }
