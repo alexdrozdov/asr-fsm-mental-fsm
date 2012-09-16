@@ -1,0 +1,72 @@
+CCP=@CXX@
+CCC=@CC@
+
+
+trg_netfind=_tst_net_find.bin
+trg_hub=_tst_hub.bin
+trg_p2vera=_tst_p2vera.bin
+trg_rcv_p2vera=_tst_rcv_p2vera.bin
+BUILD_DIR=@build_dir@
+
+CFLAGS=@CFLAGS@ @includes@ -c 
+LDFLAGS=-rdynamic @LIBS@
+
+SRCS=$(wildcard *.cpp)
+OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
+
+all:$(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) $(BUILD_DIR)/$(trg_p2vera) $(BUILD_DIR)/$(trg_rcv_p2vera) @install_targets@
+
+$(BUILD_DIR)/$(trg_netfind): dirs $(OBJS)
+	@echo [LD] $(trg_netfind); \
+	$(CCP) $(BUILD_DIR)/test_netfind.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_netfind)
+	
+$(BUILD_DIR)/$(trg_hub): dirs $(OBJS)
+	@echo [LD] $(trg_hub); \
+	$(CCP) $(BUILD_DIR)/test_hub.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_hub)
+	
+$(BUILD_DIR)/$(trg_p2vera): dirs $(OBJS)
+	@echo [LD] $(trg_p2vera); \
+	$(CCP) $(BUILD_DIR)/test_p2vera.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_p2vera)
+	
+$(BUILD_DIR)/$(trg_rcv_p2vera): dirs $(OBJS)
+	@echo [LD] $(trg_rcv_p2vera); \
+	$(CCP) $(BUILD_DIR)/common.o $(BUILD_DIR)/test_rcv.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_rcv_p2vera)
+
+install.gnulinux: FORCE
+	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_hub) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_p2vera) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_rcv_p2vera) ../../bin/
+	@echo Done
+	
+install.macos: FORCE
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_netfind)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_netfind)
+	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_hub)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_hub)
+	@cp $(BUILD_DIR)/$(trg_hub) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_p2vera)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_p2vera)
+	@cp $(BUILD_DIR)/$(trg_p2vera) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_rcv_p2vera)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_rcv_p2vera)
+	@cp $(BUILD_DIR)/$(trg_rcv_p2vera) ../../bin/
+	@echo Done
+
+dirs: FORCE
+	-@if [ ! -d $(BUILD_DIR) ]; then mkdir $(BUILD_DIR); fi
+	@cp -rf ./bin ../../
+
+$(BUILD_DIR)/%.o: %.cpp
+	@echo [CC] $< ; \
+	$(CCP) $(CFLAGS) $(CFLAGS_AUX) -MD -o $@ -c $< ;
+
+
+include $(wildcard $(BUILD_DIR)/*.d) 
+
+clean:
+	rm -rf $(BUILD_DIR)
+	
+	
+FORCE:

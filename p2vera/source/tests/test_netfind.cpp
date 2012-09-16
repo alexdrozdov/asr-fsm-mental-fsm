@@ -5,7 +5,11 @@
  *      Author: drozdov
  */
 
+#include <stdlib.h>
+#include <signal.h>
+
 #include <iostream>
+#include <list>
 
 #include <unistd.h>
 #include "p2vera.h"
@@ -14,6 +18,7 @@
 using namespace std;
 
 int main(int argc, char *argv[]) {
+	signal(SIGPIPE, SIG_IGN);
 	P2Vera* p2v = new P2Vera();
 	net_find_config nfc;
 	nfc.nf_caption = "NetFind test";
@@ -26,10 +31,16 @@ int main(int argc, char *argv[]) {
 	nf->add_scanable_server("127.0.0.1", "7300");
 	//nf->add_broadcast_servers("7300");
 	while(true) {
-		usleep(10000000);
+		usleep(1000000);
 		cout << endl;
 		cout << "Действующие сервера..." << endl;
-		nf->print_servers();
+		//nf->print_servers();
+		list<RemoteSrvUnit> rsl;
+		nf->get_alive_servers(rsl);
+		for (list<RemoteSrvUnit>::iterator it=rsl.begin();it!=rsl.end();it++) {
+			cout << it->get_uniq_id() << endl;
+		}
+		cout << endl;
 	}
 	return 0;
 }

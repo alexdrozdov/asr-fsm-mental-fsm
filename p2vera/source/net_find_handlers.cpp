@@ -106,35 +106,28 @@ bool NetFindLinkHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 	sockaddr_in sa_rq;
 	memcpy(&sa_rq, remote_addr, sizeof(sockaddr_in));
 	sa_rq.sin_port = htons(mlr.rp_port());
-	bool is_known_addr = true;
-	IRemoteNfServer* sa_rnfs = nf->by_sockaddr(sa_rq);
-	if (NULL == sa_rnfs) {
-		is_known_addr = false;
-	}
 
 	//Проверяем статус этого сервера, ищем его идентификатор среди ранее зарегистрированных
-	bool is_known_server = true;
-	IRemoteNfServer* rnfs = nf->by_uniq_id(mlr.rq_cookie_id());
-	if (NULL == rnfs) {
-		is_known_server = false; //Такой сервер ранее не встречался
-		//cout << "NetFindLinkHandler::handle_request info - discovered new server" << endl;
-		//cout << "\tAddress: " << inet_ntoa(sa_rq.sin_addr) << ":" << mlr.rp_port() << endl;
-		//cout << "\tUniq id: " << mlr.rq_cookie_id() << endl;
-
-		nf->add_discovered_server(sa_rq, mlr.rq_cookie_id());
-
-		if (is_known_addr) {
+	try {
+		RemoteSrvUnit rsu = nf->get_by_uniq_id(mlr.rq_cookie_id());
+		try {
+			RemoteSrvUnit rsu_ns = nf->get_by_sockaddr(sa_rq);
+			if (0==memcmp(&rsu.get_remote_sockaddr(), &rsu_ns.get_remote_sockaddr(), sizeof(sockaddr_in))) {
+				remote_status = cookie_status_actual; //Параметры сервера не изменились. С сервером все в порядке
+			} else {
+				remote_status = cookie_status_exists; //Такой сервер был зарегистрирован, но по другому адресу
+			}
+		} catch (...) {
+			remote_status = cookie_status_newbie;   //Странно! Сервер уже был найден раньше, но почему-то изменил свой адрес. Найти его в списках не удалось
+		}
+	} catch (...) {
+		try {
+			RemoteSrvUnit rsu_ns = nf->get_by_sockaddr(sa_rq);
 			remote_status = cookie_status_modified; //Сервер зарегистрировался по адресу, ранее принадлежавшему другому приложению
-		} else {
+		} catch (...) {
 			remote_status = cookie_status_newbie;   //Новый сервер зарегистрировался по новому адресу. Он совсем новый
 		}
-	} else {
-		//Сервер с таким идентификаторм уже существует...
-		if (sa_rnfs && 0==memcmp(&rnfs->get_remote_sockaddr(), &sa_rnfs->get_remote_sockaddr(), sizeof(sockaddr_in))) {
-			remote_status = cookie_status_actual; //Параметры сервера не изменились. С сервером все в порядке
-		} else {
-			remote_status = cookie_status_exists; //Такой сервер был зарегистрирован, но по другому адресу
-		}
+		nf->add_discovered_server(sa_rq, mlr.rq_cookie_id());
 	}
 
 	msg_link_rsp mlrs;
@@ -185,23 +178,19 @@ bool NetFindLinkHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 	memcpy(&sa_rq, remote_addr, sizeof(sockaddr_in));
 	sa_rq.sin_port = htons(mlrs.rq_port());
 
-	IRemoteNfServer* rnfs = nf->by_uniq_id(mlrs.rp_cookie_id());
-	if (NULL == rnfs) { //Сервер с таким идентификатором не найден. Регистрируем его
-		//cout << "NetFindLinkHandler::handle_response info - discovered new server" << endl;
-		//cout << "\tAddress: " << inet_ntoa(sa_rq.sin_addr) << ":" << mlrs.rq_port() << endl;
-		//cout << "\tUniq id: " << mlrs.rp_cookie_id() << endl;
-		//nf->add_discovered_server(sa_rq, mlrs.rp_cookie_id());
-		return true;
+	try {
+		RemoteSrvUnit rsu = nf->get_by_uniq_id(mlrs.rp_cookie_id());
+		//Сервер с таким идентификатором уже встречался ранее
+		IRemoteNfServer* irnfs = rsu.irnfs_ptr();
+		if (irnfs->validate_addr(sa_rq)) {
+			irnfs->add_ping_response(wrpr->msg_id());
+		} else {
+			cout << "NetFindLinkHandler::handle_response warning - remote address changed for " << mlrs.rp_cookie_id() << endl;
+			cout << "Old value " << inet_ntoa(rsu.get_remote_sockaddr().sin_addr) << ":" << rsu.get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;
+		}
+	} catch (...) {
+		nf->add_discovered_server(sa_rq, mlrs.rp_cookie_id()); //Такой сервер ранее не вустречался. Добавляем его
 	}
-
-	//Сервер с таким идентификатором уже встречался ранее
-	if (rnfs->validate_addr(sa_rq)) {
-		rnfs->add_ping_response(wrpr->msg_id());
-	} else {
-		cout << "NetFindLinkHandler::handle_response warning - remote address changed for " << mlrs.rp_cookie_id() << endl;
-		cout << "Old value " << inet_ntoa(rnfs->get_remote_sockaddr().sin_addr) << ":" << rnfs->get_remote_sockaddr().sin_port << ", new value " << inet_ntoa(sa_rq.sin_addr) <<  ":" << sa_rq.sin_port<< endl;
-	}
-
 	return true;
 }
 
@@ -369,8 +358,42 @@ bool NetFindInfoHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 	mirs.set_name(nf->get_name());
 	mirs.set_cluster(nf->get_cluster());
 
+	//Заполняем список каналов, поддерживаемых этим экземпляром библиотеки
+	for (list<stream_full_cfg>::const_iterator it=nf->streams_begin();it!=nf->streams_end();it++) {
+		p2v_channel *p2vc = mirs.add_channels();
+		p2vc->set_name(it->stream_cfg.name);
+		p2vc->set_port(it->port);
+		switch (it->stream_cfg.type) {
+			case stream_type_dgram:
+				p2vc->set_ch_mode(p2v_channel_channel_mode_m2m);
+				p2vc->set_ch_integrity(p2v_channel_channel_integrity_any);
+				break;
+			case stream_type_flow:
+				p2vc->set_ch_mode(p2v_channel_channel_mode_m2m);
+				p2vc->set_ch_integrity(p2v_channel_channel_integrity_complete);
+				break;
+		}
+		switch (it->stream_cfg.direction) {
+				case stream_direction_income:
+					p2vc->set_ep_mode(p2v_channel_endpoint_mode_receiver);
+					break;
+				case stream_direction_outcome:
+					p2vc->set_ep_mode(p2v_channel_endpoint_mode_transmitter);
+					break;
+				case stream_direction_bidir:
+					p2vc->set_ep_mode(p2v_channel_endpoint_mode_tranceiver);
+					break;
+				case stream_direction_loopback:
+					continue; //FIXME Нельзя добавлять поле, прежде чем оно не будет проверено на адекватность
+					break;
+		}
+	}
+
 	string mirs_str = "";
-	mirs.SerializeToString(&mirs_str);
+	if (!mirs.SerializeToString(&mirs_str)) {
+		cout << "NetFindInfoHandler::handle_request error - couldn`t serialize info to string" << endl;
+		return false;
+	}
 
 	msg_wrapper nwrpr;
 	nwrpr.set_msg_id(wrpr->msg_id());
@@ -403,29 +426,52 @@ bool NetFindInfoHandler::handle_response(p2vera::msg_wrapper* wrpr, sockaddr_in*
 		return false;
 	}
 
-	RemoteNfServer* rnfs = reinterpret_cast<RemoteNfServer*>(nf->by_uniq_id(mirs.rp_cookie_id()));
-	if (NULL == rnfs) { //Сервер с таким идентификатором не найден.
-		return false;
-	}
+	try {
+		RemoteSrvUnit rsu = nf->get_by_uniq_id(mirs.rp_cookie_id());
+		RemoteNfServer* rnfs = reinterpret_cast<RemoteNfServer*>(rsu.irnfs_ptr());
+		if (NULL == rnfs) { //Сервер с таким идентификатором не найден.
+			return false;
+		}
+		if (rnfs->is_self()) { //Пришел ответ от этого экземляра программы. Соединяться с ним нет смысла
+			return true;
+		}
 
-	net_find_config nfc;
-	if (mirs.has_caption()) {
-		nfc.nf_caption = mirs.caption();
-	} else {
-		nfc.nf_caption = "";
+		net_find_config nfc;
+		if (mirs.has_caption()) {
+			nfc.nf_caption = mirs.caption();
+		} else {
+			nfc.nf_caption = "";
+		}
+		if (mirs.has_name()) {
+			nfc.nf_name = mirs.name();
+		} else {
+			nfc.nf_name = "";
+		}
+		if (mirs.has_cluster()) {
+			nfc.nf_cluster = mirs.cluster();
+		} else {
+			nfc.nf_name = "";
+		}
+		rnfs->update_info(&nfc);
+		for (int i=0;i<mirs.channels_size();i++) {
+			const p2v_channel& p2vc = mirs.channels(i);
+			if (p2v_channel_endpoint_mode_transmitter == p2vc.ep_mode()) continue; //Удаленный абонент является источником сообщений и сам их не принимает. Регистрировать его не надо. При необходимости он сам к нам обратится
+			remote_endpoint re;
+			re.remote_port = p2vc.port();
+			switch (p2vc.ch_integrity()) { //В зависимости от заявленной надежности каналу устанавливаем способ доставки данных до конечной точки
+				case p2v_channel_channel_integrity_any:
+					re.str_type = stream_type_dgram;
+					break;
+				default:
+					re.str_type = stream_type_flow;
+			}
+			re.rsu = rsu;
+			nf->register_remote_endpoint(p2vc.name(), re);
+			//cout << "Channel: " << p2vc.name() << "; port: " << p2vc.port() << endl;
+		}
+	} catch (...) {
+		cout << "NetFindInfoHandler::handle_response error - unknown exception occured" << endl;
 	}
-	if (mirs.has_name()) {
-		nfc.nf_name = mirs.name();
-	} else {
-		nfc.nf_name = "";
-	}
-	if (mirs.has_cluster()) {
-		nfc.nf_cluster = mirs.cluster();
-	} else {
-		nfc.nf_name = "";
-	}
-	rnfs->update_info(&nfc);
-
 	return true;
 }
 
@@ -580,26 +626,26 @@ bool NetFindListHandler::handle_request(p2vera::msg_wrapper* wrpr, sockaddr_in* 
 		list_non_localhost = true;
 	}
 
-	list<IRemoteNfServer*> srv_list;
-	list<IRemoteNfServer*>::iterator it;
+	list<RemoteSrvUnit> srv_list;
+	list<RemoteSrvUnit>::iterator it;
 	nf->get_alive_servers(srv_list);
 	msg_srvlist_rsp mslrs;
 	for (it=srv_list.begin();it!=srv_list.end();it++) {
-		IRemoteNfServer* irnfs = *it;
-		if (irnfs->is_broadcast()) continue;  //Вещательные сервера не отправляются, т.к. не могут быть действующими по определению
-		if (!irnfs->is_localhost() && !list_non_localhost) continue; //По умолчанию отправляются только адреса локальных машин.
+		RemoteSrvUnit& rsu = *it;
+		if (rsu.is_broadcast()) continue;  //Вещательные сервера не отправляются, т.к. не могут быть действующими по определению
+		if (!rsu.is_localhost() && !list_non_localhost) continue; //По умолчанию отправляются только адреса локальных машин.
 		                                                             //адреса всех остальных машин отправляются только по специальному запросу
 
 		msg_srvlist_rsp_srv_addr* addr = mslrs.add_srv_addrs();
 		ostringstream ostr;
-		sockaddr_in sa = irnfs->get_remote_sockaddr();
+		sockaddr_in sa = rsu.get_remote_sockaddr();
 		ostr << htons(sa.sin_port);
 		addr->set_port(ostr.str());
 		ostr.str("");
 		unsigned int ip_addr = htonl(sa.sin_addr.s_addr);
 		ostr << ((ip_addr&0xFF000000)>>24) << "." << ((ip_addr&0x00FF0000)>>16) << "." << ((ip_addr&0x0000FF00)>>8) << "." << (ip_addr&0x000000FF);
 		addr->set_addr(ostr.str());
-		addr->set_uniq_id(irnfs->get_uniq_id());
+		addr->set_uniq_id(rsu.get_uniq_id());
 	}
 
 
