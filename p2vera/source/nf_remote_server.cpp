@@ -33,6 +33,7 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 	failure_count = 0;
 	full_info_present = false;
 	localhost = false;
+	is_local_program = false;
 
 	memset(&remote_addr, 0 , sizeof(sockaddr_in));
 	remote_addr.sin_family = AF_INET;
@@ -45,6 +46,12 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc) {
 
 	gettimeofday(&tv_request, NULL);
 	min_ping_time_delta = MIN_REMOTE_PING_DELTA;
+
+	if (0 != pthread_mutex_init (&mtx, NULL)) {
+		cout << "RemoteNfServer::RemoteNfServer error - couldn`t create mutex. Fatal." << endl;
+		exit(1);
+	}
+	ref_count = 1;
 }
 
 RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr) {
@@ -58,12 +65,20 @@ RemoteNfServer::RemoteNfServer(int id, net_find_config* rnfc, sockaddr_in& addr)
 	is_addr_placeholder = false;
 	full_info_present = false;
 	localhost = false;
+	is_local_program = false;
 
 	memcpy(&remote_addr, &addr, sizeof(sockaddr_in));
 	alternate_addrs.push_back(addr);
 
 	gettimeofday(&tv_request, NULL);
 	min_ping_time_delta = MIN_REMOTE_PING_DELTA;
+
+	pthread_mutex_init (&mtx, NULL);
+	ref_count = 1;
+}
+
+RemoteNfServer::~RemoteNfServer() {
+	pthread_mutex_destroy(&mtx);
 }
 
 //Проверить возможность установки связи с этим приложением.
@@ -109,7 +124,7 @@ void RemoteNfServer::add_ping_request(int ping_id) {
 			unsigned  int delta = ((1000000-rmtp.ping_send_time.tv_usec)+(tv_request.tv_usec-1000000)+(tv_request.tv_sec-rmtp.ping_send_time.tv_sec)*1000000) / 1000;
 			if (delta>MAX_PING_TIMEOUT) {
 				pings_sent.erase(it,it);
-				failure_count++;
+				failure_count++; //FIXME Удаление итератора реализовано некорректноs
 			}
 		}
 	}
@@ -229,6 +244,14 @@ bool RemoteNfServer::is_localhost() {
 	return localhost;
 }
 
+bool RemoteNfServer::is_self() {
+	return is_local_program;
+}
+
+void RemoteNfServer::is_self(bool b) {
+	is_local_program = b;
+}
+
 void RemoteNfServer::is_localhost(bool b) {
 	localhost = b;
 }
@@ -244,5 +267,28 @@ void RemoteNfServer::print_info() {
 	} else {
 		cout << "warning: aux info unavaible" << endl;
 	}
+}
+
+bool RemoteNfServer::increase_ref_count() {
+	pthread_mutex_lock(&mtx);
+	bool succed = (ref_count > 0);
+	if (ref_count > 0) ref_count++;
+	pthread_mutex_unlock(&mtx);
+	return succed;
+}
+
+int RemoteNfServer::decrease_ref_count() {
+	int tmp = 0;
+	pthread_mutex_lock(&mtx);
+	ref_count--;
+	tmp = ref_count;
+	pthread_mutex_unlock(&mtx);
+	return tmp;
+}
+
+bool RemoteNfServer::is_referenced() {
+	//cout << "RemoteNfServer::is_referenced - ref count " << ref_count << endl;
+	if (ref_count > 0) return true;
+	return false;
 }
 

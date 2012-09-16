@@ -28,6 +28,9 @@
 #include "inet_find.h"
 #include "mtx_containers.hpp"
 
+#include "p2stream.h"
+#include "tcpstream.h"
+
 #define MAX_FAILURES_COUNT 5
 #define MAX_PING_RESP_TIMEOUT 1
 
@@ -46,6 +49,21 @@ typedef struct _rmt_ping {
 	_rmt_ping& operator=(const _rmt_ping& rmtp);
 } rmt_ping;
 
+typedef struct _remote_endpoint {
+	RemoteSrvUnit rsu;
+	int remote_port;
+	stream_type str_type;
+} remote_endpoint;
+
+typedef struct _stream_full_cfg {
+	stream_config stream_cfg; //Параметры соединения
+	sockaddr_in local_sa;     //Локальный адрес порта, на котором это соединение прослушивается
+	int port;                 //Порт (частично повторяет данные из local_sa)
+	int sock_fd;              //Сокет этого соединения
+	std::list<remote_endpoint> remote_endpoints; //Удаленные сервера, с которыми может быть установлено соединение этим потоком
+	IP2VeraStreamHub* sh;
+} stream_full_cfg;
+
 
 //Класс обеспечивает поиск приложений, работающих в одной сети с ним на одном порту
 //На локальной машине может выполнять функции клиента или сервера с переходом в режим
@@ -58,12 +76,12 @@ public:
 	virtual int add_broadcast_servers(std::string port); //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
 	virtual int add_discovered_server(sockaddr_in& addr, std::string uniq_id);
 
-	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa);     //Поиск сервера по его обратному адресу
-	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id); //Поиск сервера по его уникальному идентификатору
 	virtual void remove_remote_server(int id); //Удаление сервера из списка. Сервер может быть снова найден и получит новый id
 	virtual void print_servers();              //Вывод в консоль списка известрных серверов с их статусами
 
-	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list);
+	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list);
+	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa);
+	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id);
 
 	virtual std::string get_uniq_id();
 	virtual std::string get_name();
@@ -74,6 +92,13 @@ public:
 	virtual unsigned int get_client_port();
 
 	virtual bool is_localhost(sockaddr_in& sa); //Проверят, относится ли ip адрес к этому компьютеру
+
+	virtual int register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh);   //Зарегистрировать новый поток сообщений, по которому возможно взаимодействие
+	virtual void register_remote_endpoint(std::string stream_name, remote_endpoint& re);
+	virtual std::list<stream_full_cfg>::const_iterator streams_begin();
+	virtual std::list<stream_full_cfg>::const_iterator streams_end();
+
+	virtual IP2VeraStreamHub* find_stream_hub(std::string stream_name);
 
 	friend void* nf_server_rsp_thread_fcn (void* thread_arg);
 	friend void* nf_client_thread_fcn (void* thread_arg);
@@ -112,15 +137,25 @@ private:
 	void invoke_requests();
 	void review_remote_servers();
 	void unlink_server(IRemoteNfServer* irnfs); //Начать удаление сервера
+	void unlink_server_stream(IRemoteNfServer* irnfs); //Удалить сервер из списка получателей сообщений
 
 	virtual void load_ifinfo();
 	void reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* rnfs);   //Привязка сервера к его адресу
+
+	virtual int register_dgram_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh);
+	virtual int register_flow_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh);
+
+	TcpStreamManager *tcm; //Компонент, управляющий tcp-соединениями
+
 
 	std::map<int, INetFindMsgHandler*> msg_handlers; //Обработчики сетевых сообщений, приходящих по протоколу UDP
 
 	NetFindLinkHandler *link_handler;
 	NetFindInfoHandler *info_handler;
 	NetFindListHandler *list_handler;
+
+	std::list<stream_full_cfg> streams;
+	std::list<stream_full_cfg>::iterator find_stream(std::string name);
 
 	std::string name;
 	std::string caption;

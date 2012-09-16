@@ -26,6 +26,8 @@
 #include "msg_wrapper.pb.h"
 #include "msg_netfind.pb.h"
 
+#include "tcpstream.h"
+
 #include "mtx_containers.h"
 #include "mtx_containers.hpp"
 
@@ -35,6 +37,12 @@
 using namespace std;
 using namespace p2vera;
 using namespace netfind;
+
+#ifdef DBG_PRINT
+#define _D(str) str
+#else
+#define _D(str) {}
+#endif
 
 
 _rmt_ping& _rmt_ping::operator=(const _rmt_ping& rmtp) {
@@ -80,6 +88,8 @@ NetFind::NetFind(net_find_config *nfc) {
 	msg_handlers[1] = info_handler;
 	msg_handlers[2] = list_handler;
 
+	tcm = new TcpStreamManager(this, 8000);
+
 	//Создаем потоки
 	pthread_t thread_id;
 	pthread_create(&thread_id, NULL, &nf_server_rsp_thread_fcn, this); //Поток, выполняющий роль сервера
@@ -111,6 +121,171 @@ bool NetFind::is_localhost(sockaddr_in& sa) {
 	return false;
 }
 
+int NetFind::register_dgram_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
+	pthread_mutex_lock(&mtx);
+	if (streams.end() != find_stream(stream_cfg.name)) {
+		cout << "NetFind::register_dgram_stream error - stream " << stream_cfg.name << " was already registered" << endl;
+		pthread_mutex_unlock(&mtx);
+		throw;
+	}
+	stream_full_cfg sfc;
+	sfc.stream_cfg.name = stream_cfg.name;
+	sfc.stream_cfg.direction = stream_cfg.direction;
+	sfc.stream_cfg.order = stream_cfg.order;
+	sfc.stream_cfg.type = stream_cfg.type;
+
+	sfc.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	memset(&sfc.local_sa, 0, sizeof(sockaddr_in));
+	sfc.local_sa.sin_family = AF_INET;
+	sfc.local_sa.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	_D(cout << "NetFind::register_dgram_stream info - поиск свободного порта для " << stream_cfg.name << endl);
+	int rc = -1;
+	sfc.port =  server_port + 10;
+	while (rc < 0) {
+		usleep(1000);
+		sfc.port++;
+		if (sfc.port >= 65535) {
+			cout << "NetFind::register_dgram_stream error - couldn`t find free port" << endl;
+			return 0;
+		}
+		sfc.local_sa.sin_port = htons((unsigned short)sfc.port);
+		rc = bind(sfc.sock_fd, (struct sockaddr *)&sfc.local_sa, sizeof(sockaddr_in));
+	}
+	_D(cout << "NetFind::register_dgram_stream info - binded stream " << stream_cfg.name << " at port " << sfc.port << endl);
+
+	sfc.sh = sh;
+	streams.push_back(sfc);
+	pthread_mutex_unlock(&mtx);
+	return sfc.sock_fd;
+}
+
+int NetFind::register_flow_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
+	pthread_mutex_lock(&mtx);
+	if (streams.end() != find_stream(stream_cfg.name)) {
+		cout << "NetFind::register_flow_stream error - stream " << stream_cfg.name << " was already registered" << endl;
+		pthread_mutex_unlock(&mtx);
+		throw;
+	}
+	stream_full_cfg sfc;
+	sfc.stream_cfg.name = stream_cfg.name;
+	sfc.stream_cfg.direction = stream_cfg.direction;
+	sfc.stream_cfg.order = stream_cfg.order;
+	sfc.stream_cfg.type = stream_cfg.type;
+
+	sfc.sock_fd = tcm->get_fd();
+	sfc.port = tcm->get_port();
+
+	sfc.sh = sh;
+	streams.push_back(sfc);
+	pthread_mutex_unlock(&mtx);
+	return 0;
+}
+
+int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
+	if (NULL == sh) {
+		cout << "NetFind::register_stream error - null pointer to IP2VeraStreamHub" << endl;
+		return 0;
+	}
+
+	switch(stream_cfg.type) {
+		case stream_type_dgram:
+			return register_dgram_stream(stream_cfg, sh);
+			break;
+		case stream_type_flow:
+			return register_flow_stream(stream_cfg, sh);
+			break;
+		default:
+			cout << "NetFind::register_stream error - unsupported stream type" << endl;
+	}
+	return 0;
+}
+
+void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint& re) {
+	if (stream_type_dgram == re.str_type) {
+		_D(cout << "NetFind::register_remote_endpoint info - requested to register dgram stream " << stream_name << endl);
+		pthread_mutex_lock(&mtx);
+		list<stream_full_cfg>::iterator it = find_stream(stream_name);
+		if (streams.end() == it) { //Такой поток не зарегистрирован.
+			pthread_mutex_unlock(&mtx);
+			_D(cout << "NetFind::register_remote_endpoint info - stream " << stream_name << " is undefined" << endl);
+			return;
+		}
+		stream_full_cfg& sfc = *it;
+
+		//Ищем, переданный endpoint среди ранее зарегистрированных
+		for (list<remote_endpoint>::iterator re_it=sfc.remote_endpoints.begin();re_it!=sfc.remote_endpoints.end();re_it++) {
+			if (re_it->rsu == re.rsu) { //Такой сервер уже обработан и зарегистрирован
+				pthread_mutex_unlock(&mtx);
+				_D(cout << "NetFind::register_remote_endpoint info - stream " << stream_name << " was allready aasociated with hub" << endl);
+				return;
+			}
+		}
+		sfc.remote_endpoints.push_back(re);
+		if (NULL == sfc.sh) {
+			cout << "NetFind::register_remote_endpoint error - zero pointer to stream hub" << endl;
+			pthread_mutex_unlock(&mtx);
+			_D(cout << "NetFind::register_remote_endpoint info - stream " << stream_name << " is undefined" << endl);
+			return;
+		}
+		sfc.sh->add_message_target(re.rsu, re.remote_port);
+		pthread_mutex_unlock(&mtx);
+	} else if (stream_type_flow == re.str_type) {
+		_D(cout << "NetFind::register_remote_endpoint info - requested to register dgram stream " << stream_name << endl);
+		pthread_mutex_lock(&mtx);
+		list<stream_full_cfg>::iterator it = find_stream(stream_name);
+		if (streams.end() == it) { //Такой поток не зарегистрирован.
+			pthread_mutex_unlock(&mtx);
+			return;
+		}
+
+		tcm->add_server(re.rsu, re.remote_port);  //Добавляем вновь найденный сервер (при его отсутствии)
+		TcpStream tc = tcm->find_stream(re.rsu); //Ищем вновь созданный поток
+		//FIXME Сервер может оказаться недоступным. Проверять возвращенное значение
+		tc.add_hub(it->sh); //Добавляем хаб с указанным именем к списку хабов, связанных с этим сервером
+		pthread_mutex_unlock(&mtx);
+	}
+}
+
+void NetFind::unlink_server_stream(IRemoteNfServer* irnfs) {
+	//Просматриваем все зарегистрированные потоки
+	for (list<stream_full_cfg>::iterator it_sfc=streams.begin();it_sfc!=streams.end();it_sfc++) {
+		stream_full_cfg& sfc = *it_sfc;
+
+		//В каждом зарегистрированном потоке ищем удаляемый сервер
+		for (list<remote_endpoint>::iterator re_it=sfc.remote_endpoints.begin();re_it!=sfc.remote_endpoints.end();) {
+			if (re_it->rsu != irnfs) {
+				++re_it;
+				continue;
+			}
+			sfc.sh->remove_message_target(re_it->rsu);
+			re_it = sfc.remote_endpoints.erase(re_it);
+		}
+	}
+}
+
+std::list<stream_full_cfg>::const_iterator NetFind::streams_begin() {
+	return streams.begin();
+}
+
+std::list<stream_full_cfg>::const_iterator NetFind::streams_end() {
+	return streams.end();
+}
+
+std::list<stream_full_cfg>::iterator NetFind::find_stream(std::string name) {
+	for (std::list<stream_full_cfg>::iterator it=streams.begin();it!=streams.end();it++) {
+		if (it->stream_cfg.name == name) return it;
+	}
+	return streams.end();
+}
+
+IP2VeraStreamHub* NetFind::find_stream_hub(std::string stream_name) {
+	std::list<stream_full_cfg>::iterator it = find_stream(stream_name);
+	if (streams.end()==it) return NULL;
+	return it->sh;
+}
+
 
 //Позволяет проверить текущий режим этой копии библиотеки
 bool NetFind::is_server() {
@@ -125,12 +300,17 @@ int NetFind::generate_remote_id() {
 }
 
 int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
-	if (NULL != by_uniq_id(uniq_id)) {
-		return -1;
-	}
 	bool b_localhost = is_localhost(addr);
 	if (b_localhost &&  htons(addr.sin_port)==get_server_port()) {
 		return -1; //Это локальный сервер. Как он оказался среди всего этого непонятно, но добавлять его не стоит
+	}
+	int remote_id = generate_remote_id();
+
+	pthread_mutex_lock(&mtx);
+	map<std::string, IRemoteNfServer*>::iterator it = m_str_servers.find(uniq_id);
+	if (it != m_str_servers.end()) {
+		pthread_mutex_unlock(&mtx);
+		return -1;
 	}
 
 	net_find_config nfc;
@@ -140,23 +320,24 @@ int NetFind::add_discovered_server(sockaddr_in& addr, std::string uniq_id) {
 	nfc.scanable = true;
 	nfc.usage = 0;
 
-	int remote_id = generate_remote_id();
 	RemoteNfServer* rnfs = new RemoteNfServer(remote_id, &nfc, addr);
 	if (b_localhost) { //Для серверов, работающих на локальной машине добавляем все адреса, с которых могут приходить ответы
 		rnfs->is_localhost(true);
+		if (uniq_id == get_uniq_id()) {
+			rnfs->is_self(true);
+		}
 		vector<sockaddr_in>::iterator it;
 		for (it=local_ips.begin();it!=local_ips.end();it++) {
 			rnfs->add_alternate_addr(*it);
 		}
 	}
 
-	pthread_mutex_lock(&mtx);
 	remote_servers.push_back(rnfs);
 	m_str_servers[uniq_id] = rnfs;
 	reg_to_sockaddr(addr, rnfs);
 	pthread_mutex_unlock(&mtx);
 
-	if (rnfs->requires_info_request()) {
+	if (rnfs->requires_info_request()) { //FIXME Возможны гонки при добавлении серверов из нескольких потоков
 		info_list.push_back(rnfs);
 	}
 
@@ -196,32 +377,6 @@ int NetFind::add_broadcast_servers(std::string port) {
 	return 0;
 }
 
-//Поиск сервера по его обратному адресу
-IRemoteNfServer* NetFind::by_sockaddr(sockaddr_in& sa) {
-	pthread_mutex_lock(&mtx);
-	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
-	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
-	if (it == m_sa_servers.end()) {
-		pthread_mutex_unlock(&mtx);
-		return NULL;
-	}
-
-	pthread_mutex_unlock(&mtx);
-	return it->second;
-}
-
-//Поиск сервера по его уникальному идентификатору
-IRemoteNfServer* NetFind::by_uniq_id(std::string uniq_id) {
-	pthread_mutex_lock(&mtx);
-	map<std::string, IRemoteNfServer*>::iterator it = m_str_servers.find(uniq_id);
-	if (it == m_str_servers.end()) {
-		pthread_mutex_unlock(&mtx);
-		return NULL;
-	}
-	pthread_mutex_unlock(&mtx);
-	return it->second;
-}
-
 void NetFind::reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* irnfs) {
 	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
 	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
@@ -229,9 +384,7 @@ void NetFind::reg_to_sockaddr(sockaddr_in& sa, IRemoteNfServer* irnfs) {
 		//Сервер с таким сочетанием ip--слушающий-порт уже был зарегистрирован ранее
 		//это означает, что он завершил свою работу. Теперь его необходимо пометить, как
 		//неактивный
-		IRemoteNfServer* sa_irnfs = it->second;
-		sa_irnfs->forbide_usage();
-		cout << "NetFind::reg_to_sockaddr info - server " << sa_irnfs->get_uniq_id() << " was replaced by " << irnfs->get_uniq_id() << endl;
+		cout << "NetFind::reg_to_sockaddr info - server at " << inet_ntoa(sa.sin_addr) << ":" << htons(sa.sin_port) << " was replaced by " << irnfs->get_uniq_id() << endl;
 	}
 	lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
 	m_sa_servers[lsa] = irnfs;
@@ -256,16 +409,44 @@ void NetFind::print_servers() {
 	pthread_mutex_unlock(&mtx);
 }
 
-void NetFind::get_alive_servers(std::list<IRemoteNfServer*>& srv_list) {
+void NetFind::get_alive_servers(std::list<RemoteSrvUnit>& srv_list) {
 	srv_list.clear();
 	pthread_mutex_lock(&mtx);
 	list<IRemoteNfServer*>::iterator it;
 	for (it=remote_servers.begin();it!=remote_servers.end();it++) {
 		IRemoteNfServer* irnfs = *it;
-		if (NULL == irnfs) continue;
-		srv_list.push_back(irnfs);
+		if (NULL == irnfs || irnfs->is_broadcast()) continue;
+		RemoteSrvUnit rs(irnfs);
+		srv_list.push_back(rs);
 	}
 	pthread_mutex_unlock(&mtx);
+}
+
+RemoteSrvUnit NetFind::get_by_sockaddr(sockaddr_in& sa) {
+	pthread_mutex_lock(&mtx);
+	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	map<unsigned long long, IRemoteNfServer*>::iterator it = m_sa_servers.find(lsa);
+	if (it == m_sa_servers.end() || NULL==it->second) {
+		pthread_mutex_unlock(&mtx);
+		throw server_not_found();
+	}
+	IRemoteNfServer* irnfs = it->second;
+	RemoteSrvUnit rs(irnfs);
+	pthread_mutex_unlock(&mtx);
+	return rs;
+}
+
+RemoteSrvUnit NetFind::get_by_uniq_id(std::string uniq_id) {
+	pthread_mutex_lock(&mtx);
+	map<std::string, IRemoteNfServer*>::iterator it = m_str_servers.find(uniq_id);
+	if (it == m_str_servers.end() || NULL==it->second) {
+		pthread_mutex_unlock(&mtx);
+		throw server_not_found();
+	}
+	IRemoteNfServer* irnfs = it->second;
+	RemoteSrvUnit rs(irnfs);
+	pthread_mutex_unlock(&mtx);
+	return rs;
 }
 
 unsigned int NetFind::get_server_port() {
@@ -326,7 +507,7 @@ bool NetFind::bind_client_port() {
 	clientaddr.sin_family = AF_INET;
 	clientaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	cout << "NetFind::client_thread info - поиск свободного порта..." << endl;
+	_D(cout << "NetFind::client_thread info - поиск свободного порта..." << endl);
 	int rc = -1;
 	client_port = server_port;
 	while (rc < 0) {
@@ -399,8 +580,8 @@ void NetFind::review_remote_servers() {
 		if (NULL == irnfs) continue; //Этот сервер уже был удален
 		irnfs->validate_alive(); //Проверяем, что сервер пингуется
 		if (!irnfs->is_alive() && !irnfs->is_broadcast()) {
-			unlink_server(irnfs); //Сервер недоступен. Подготовить его к удалению
 			it_rs = remote_servers.erase(it_rs);
+			unlink_server(irnfs); //Сервер недоступен. Подготовить его к удалению
 			continue;
 		}
 		if (irnfs->ping_allowed()) {
@@ -432,12 +613,24 @@ void NetFind::invoke_requests() {
 //ожидающих удаления и удален из всех остальных списоков
 void NetFind::unlink_server(IRemoteNfServer* irnfs) {
 	if (NULL == irnfs) return;
-	remove_list.push_back(irnfs);
+	unlink_server_stream(irnfs);
 
 	string uniq_id = irnfs->get_uniq_id();
 	map<std::string, IRemoteNfServer*>::iterator it_uid = m_str_servers.find(uniq_id);
 	if (it_uid != m_str_servers.end()) {
 		m_str_servers.erase(it_uid);
+	}
+
+	//По возможности удаляем этот сервер из списка хостов. Только в том случае, если он не он не изменился
+	sockaddr_in& sa = irnfs->get_remote_sockaddr();
+	unsigned long long lsa = ((unsigned long long)sa.sin_port << 32) | ((unsigned int)sa.sin_addr.s_addr);
+	map<unsigned long long, IRemoteNfServer*>::iterator it_sa = m_sa_servers.find(lsa);
+	if (it_sa!=m_sa_servers.end() && irnfs==it_sa->second) {
+		m_sa_servers.erase(it_sa);
+	}
+
+	if (0 == irnfs->decrease_ref_count()) {
+		delete irnfs;
 	}
 }
 

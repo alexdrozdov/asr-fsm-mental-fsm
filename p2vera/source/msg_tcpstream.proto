@@ -1,0 +1,26 @@
+package tcpstream;
+
+//Сообщение добавления нового потока внутри tcp соединения
+message msg_add_flow_rq {
+	required string rq_cookie_id  = 1;
+	required string flow_name     = 2; //Название потока
+	required int32 flow_id        = 3; //Идентификатор потока (выбирается отправителем сообщения) 
+}
+
+message msg_add_flow_rp { //Сообщение с подтверждением добавления потока
+	required string rq_cookie_id  = 1;
+	required string rp_cookie_id  = 2;
+	required string flow_name     = 3;
+	required int32 flow_id        = 4;
+}
+
+message tcp_flow_wrapper {
+	required int32 flow_id    = 1;
+	required string flow_data = 2;
+}
+
+message tcp_wrapper {
+	optional msg_add_flow_rq add_flow_rq = 1;
+	optional msg_add_flow_rp add_flow_rp = 2;
+	repeated tcp_flow_wrapper tcp_flow   = 3;
+}

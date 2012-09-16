@@ -1,9 +1,13 @@
 /*
  * inet_find.h
  *
+ * Файл описывает интерфейсы компонента обнаружения программ, использующих
+ * p2vera в пределах одного сегмента ЛВС.
+ *
  *  Created on: 10.06.2012
  *      Author: drozdov
  */
+
 
 #ifndef INET_FIND_H_
 #define INET_FIND_H_
@@ -14,6 +18,17 @@
 
 #include <string>
 #include <list>
+
+class INetFind;
+class IRemoteNfServer;
+class RemoteSrvUnit;
+class IP2VeraStreamHub;
+struct _stream_config;
+
+class server_not_found {
+public:
+	server_not_found() {};
+};
 
 //Конфигурация модуля поиска приложений в сети
 typedef struct _net_find_config {
@@ -30,6 +45,7 @@ typedef struct _net_find_config {
 
 class IRemoteNfServer {
 public:
+	virtual ~IRemoteNfServer() = 0;
 	virtual bool is_alive() = 0;      //Проверить возможность установки связи с этим приложением.
 						              //Не гарантирует жизнеспособность приложения в текущий момент,
 						              //опирается на наличие ответов в недавнем прошлом.
@@ -55,27 +71,76 @@ public:
 
 	virtual bool is_broadcast() = 0; // Сервер на самом деле не существует, а используется для хранения информации о вещательных запросах
 	virtual bool is_localhost() = 0; // Сервер рабоает на тойже машине, что и эта копия библиотеки
+	virtual bool is_self() = 0;      // Сервер запущен в этом экземпляре программы
 	virtual void print_info() = 0;   // Вывести параметры сервера в консоль
+
+	virtual bool increase_ref_count() = 0; //Увеличивает счетчик ссылок на экземпляр класса
+	virtual int decrease_ref_count() = 0; //Уменьшает счетчик ссылок на экземпляр класса
+	virtual bool is_referenced() = 0;      //Позволяет проверить наличие ссылок на экземпляр и возможность его удаления
 };
 
+//Инетерфейс, предоставляющий доступ к удаленному серверу. Клиенты должны использовать в
+//своих задачах именно этот класс, т.к. он обеспечивает подсчет ссылок на интерфейс
+//IRemoteNfServer. Назначение класса - сборка мусора и удаление серверов, ставших недоступными
+//по мере прекращения их использования
+class RemoteSrvUnit {
+public:
+	RemoteSrvUnit();
+	RemoteSrvUnit(const RemoteSrvUnit& original);
+	RemoteSrvUnit(IRemoteNfServer* itm);
+	RemoteSrvUnit& operator=(IRemoteNfServer* original);
+	virtual ~RemoteSrvUnit();
+	virtual bool is_alive();     //Признак активности узла
+	virtual bool is_broadcast(); //Признак вещательного узла
+	virtual bool is_localhost(); //Признак узла, расположенного на локальной машине
+	virtual bool is_self();      //Признак узла, относящегося к этой программе
+	virtual std::string get_uniq_id();
+	virtual std::string get_name();
+	virtual std::string get_caption();
+	virtual sockaddr_in& get_remote_sockaddr();
+	virtual IRemoteNfServer* irnfs_ptr();
+
+	RemoteSrvUnit& operator=(RemoteSrvUnit& original);
+	friend class INetFind;
+	friend bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+	friend bool operator==(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+	friend bool operator==(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
+	friend bool operator!=(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+	friend bool operator!=(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+	friend bool operator!=(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
+private:
+	IRemoteNfServer* irnfs;
+protected:
+};
+
+extern bool operator==(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+extern bool operator==(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+extern bool operator==(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
+extern bool operator!=(const RemoteSrvUnit& lh, const RemoteSrvUnit& rh);
+extern bool operator!=(const RemoteSrvUnit& lh, const IRemoteNfServer* irns);
+extern bool operator!=(const IRemoteNfServer* irns, const RemoteSrvUnit& rh);
+
+//Интерфейс класса, обнаруживающего и отслеживающего списки приложений в сети
 class INetFind {
 public:
 
-	virtual bool is_server() = 0; //Позволяет проверить текущий режим этой копии библиотеки
-	virtual int add_scanable_server(std::string address, std::string port) = 0;
-	virtual int add_broadcast_servers(std::string port) = 0; //Автоматическое обнаружение серверов, отвечающих на вещательные запросы
+	virtual bool is_server() = 0;                                               //Позволяет проверить текущий режим этой копии библиотеки
+	virtual int add_scanable_server(std::string address, std::string port) = 0; //Добавить адрес сервера, на котором могут запускаться приложения. Сервер будет периодически опрашиваться классом
+	virtual int add_broadcast_servers(std::string port) = 0;                    //Автоматическое обнаружение серверов, отвечающих на вещательные запросы по указанному порту
 
-	virtual IRemoteNfServer* by_sockaddr(sockaddr_in& sa) = 0;     //Поиск сервера по его обратному адресу
-	virtual IRemoteNfServer* by_uniq_id(std::string uniq_id) = 0; //Поиск сервера по его уникальному идентификатору
+	virtual void get_alive_servers(std::list<RemoteSrvUnit>& srv_list) = 0;     //Заполняет список действующих серверов.
+	virtual RemoteSrvUnit get_by_sockaddr(sockaddr_in& sa) = 0;                 //Поиск приложения, слушающего по указанному адресу (ip+порт)
+	virtual RemoteSrvUnit get_by_uniq_id(std::string uniq_id) = 0;              //Поиск приложения по его уникальному идентификатору
 
-	virtual void get_alive_servers(std::list<IRemoteNfServer*>& srv_list) = 0; //Заполняет список действующих серверов.
+	virtual void print_servers() = 0;                                           //Вывод в консоль списка обнеруженных приложений
 
-	virtual void print_servers() = 0;
+	virtual std::string get_uniq_id() = 0;                                      //Узнать уникальный идентификатор этого экземпляра класса
+	virtual std::string get_name() = 0;                                         //Узнать название
+	virtual std::string get_caption() = 0;                                      //Узнать название (отображаемое для пользователя)
+	virtual std::string get_cluster() = 0;                                      //Определить кластер приложений, в котором заерегистрировался экземляр класса
 
-	virtual std::string get_uniq_id() = 0;
-	virtual std::string get_name() = 0;
-	virtual std::string get_caption() = 0;
-	virtual std::string get_cluster() = 0;
+	virtual int register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) = 0;         //Зарегистрировать новый поток сообщений, по которому возможно взаимодействие
+	virtual IP2VeraStreamHub* find_stream_hub(std::string stream_name) = 0;     //Поиск зарегистрированного потока по его имени
 };
 
 extern INetFind* net_find_create(net_find_config *nfc);
