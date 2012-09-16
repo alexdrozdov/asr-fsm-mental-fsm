@@ -3,7 +3,7 @@
 
 max_procs=10
 run_delay=1
-run_task='LD_LIBRARY_PATH=`pwd`/ ./_tst_net_find.bin > /dev/null &'
+run_task='LD_LIBRARY_PATH=`pwd`/ ./_tst_p2vera.bin > /dev/null &'
 NO_ARGS=0
 if [ $# -gt "$NO_ARGS" ] ; then
     while getopts "d:n:" option ; do

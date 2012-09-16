@@ -10,21 +10,36 @@
 
 #include <string>
 #include <list>
+#include <vector>
 
 class CfgReaderIterator;
 class CfgReader;
+class CfgItem;
+typedef std::list<CfgItem*> cfg_list;
+typedef cfg_list::iterator cfg_item_iter;
 
-class CfgItem {
+class ICfgItemList {
+public:
+	virtual ~ICfgItemList() = 0;
+	virtual cfg_item_iter end() = 0;
+	virtual cfg_item_iter begin() = 0;
+};
+
+class CfgItem : public ICfgItemList {
 public:
 	CfgItem(std::string section, std::string name, std::string value);
-	//std::string std::string();
-	operator int();
-	operator bool();
-	operator std::string();
+	virtual ~CfgItem();
+	virtual operator int();
+	virtual operator bool();
+	virtual operator std::string();
 
-	std::string to_string() const;
-	int to_int() const;
-	bool to_bool() const;
+	virtual std::string to_string() const;
+	virtual int to_int() const;
+	virtual bool to_bool() const;
+
+	virtual CfgReaderIterator get_cfg_items(std::string name);
+	virtual cfg_item_iter end();
+	virtual cfg_item_iter begin();
 
 	friend class CfgReaderIterator;
 	friend class CfgReader;
@@ -32,20 +47,19 @@ private:
 	std::string value;
 	std::string section;
 	std::string name;
-};
 
-typedef std::list<CfgItem> cfg_list;
-typedef cfg_list::iterator cfg_item_iter;
+	cfg_list items;
+};
 
 class CfgReaderIterator {
 public:
-	CfgReaderIterator(std::string section, std::string name, cfg_item_iter cii, CfgReader* cr);
+	CfgReaderIterator(std::string section, std::string name, cfg_item_iter cii, ICfgItemList* cr);
 	CfgReaderIterator(const CfgReaderIterator& cri);
 	virtual ~CfgReaderIterator();
 	CfgReaderIterator& operator=(CfgReaderIterator& cri);
 	CfgReaderIterator& operator++();
 	CfgReaderIterator& operator++(int);
-	const CfgItem* operator->();
+	CfgItem* operator->();
 	friend bool operator==(CfgReaderIterator& lh, CfgReaderIterator& rh);
 	friend bool operator==(CfgReaderIterator& lh, cfg_item_iter& rh);
 	friend bool operator==(cfg_item_iter& lh, CfgReaderIterator& rh);
@@ -56,7 +70,7 @@ private:
 	std::string section;
 	std::string name;
 	cfg_item_iter cur_cii;
-	CfgReader* cr;
+	ICfgItemList* cr;
 };
 
 bool operator==(CfgReaderIterator& lh, CfgReaderIterator& rh);
@@ -66,21 +80,28 @@ bool operator!=(const CfgReaderIterator lh, const CfgReaderIterator rh);
 bool operator!=(const CfgReaderIterator lh, cfg_item_iter rh);
 bool operator!=(cfg_item_iter lh, const CfgReaderIterator rh);
 
-class CfgReader {
+class CfgReader : public ICfgItemList {
 public:
 	CfgReader(std::string cfg_file);
 	virtual ~CfgReader();
-	CfgReaderIterator get_cfg_items(std::string section, std::string name);
-	cfg_item_iter end();
-	cfg_item_iter begin();
+	virtual CfgReaderIterator get_cfg_items(std::string section, std::string name);
+	virtual bool has_item(std::string section, std::string name);
+	virtual int item_count(std::string section, std::string name);
+	virtual std::string get_item_as_string(std::string section, std::string name, std::string def_value);
+	virtual int get_item_as_int(std::string section, std::string name, int def_value);
+	virtual bool get_item_as_bool(std::string section, std::string name, bool def_value);
+	virtual cfg_item_iter end();
+	virtual cfg_item_iter begin();
 
 	friend class CfgReaderIterator;
 private:
 	cfg_list items;
+	std::vector<CfgItem*> item_levels; //Массив, представляющий собой текущие уровни вложенности опций
 	std::string current_section;
 
-	void parse_section(const char *str, int len);
-	void parse_option(const char *str, int len);
+	virtual int get_eff_line_length(const char *str, int len);
+	virtual void parse_section(const char *str, int len);
+	virtual void parse_option(const char *str, int len);
 };
 
 #endif /* CFG_READER_H_ */

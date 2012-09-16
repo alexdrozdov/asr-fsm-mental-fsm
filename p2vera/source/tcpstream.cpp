@@ -28,6 +28,12 @@
 using namespace std;
 using namespace tcpstream;
 
+#ifdef DBG_PRINT
+#define _D(str) str
+#else
+#define _D(str) {}
+#endif
+
 enum EBufProcessState {
 	bps_unknown = 0,
 	bps_start   = 1,
@@ -467,7 +473,7 @@ TcpStreamManager::TcpStreamManager(INetFind* nf, int start_port) {
 			accept_port++;
 			continue;
 		}
-		cout << "TcpStreamManager::TcpStreamManager info - binded on port " << accept_port << endl;
+		_D(cout << "TcpStreamManager::TcpStreamManager info - binded on port " << accept_port << endl);
 		binded = true;
 		break;
 	}
@@ -533,7 +539,7 @@ void TcpStreamManager::add_server(RemoteSrvUnit& rsu, int remote_port) {
 		}
 	}
 
-	cout << "TcpStreamManager::add_server info - registering server " << rsu.get_uniq_id() << endl;
+	_D(cout << "TcpStreamManager::add_server info - registering server " << rsu.get_uniq_id() << endl);
 	rsu_fd_item rfi;
 	rfi.rsu = rsu;
 	TcpStreamConnection *tsc = new TcpStreamConnection(net_find, rsu, remote_port);

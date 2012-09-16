@@ -28,6 +28,7 @@
 #include "p2stream.h"
 #include "p2hub.h"
 #include "p2message.h"
+#include "cfg_reader.h"
 
 using namespace std;
 
@@ -46,6 +47,87 @@ P2Vera::P2Vera() {
 	networking_active = false;
 	generate_uniq_id();
 	create_netfind();
+	if (0 != pthread_mutex_init(&mtx, NULL)) {
+		cout << "P2Vera::P2Vera error - couldn`t create mutex. Fatal." << endl;
+		exit(1);
+	}
+}
+
+P2Vera::P2Vera(std::string cfg_file) {
+	CfgReader cr(cfg_file);
+	networking_active = false;
+	generate_uniq_id();
+
+	net_find_config nfc; //Создаем и настраиваем модуль обнаружения с настройками из переданного файла
+	nfc.nf_caption = cr.get_item_as_string("local_server", "caption", "p2v default caption");
+	nfc.nf_name    = cr.get_item_as_string("local_server", "name", "p2v default caption");
+	nfc.nf_address = cr.get_item_as_string("local_server", "address", "127.0.0.1");
+	nfc.nf_port    = cr.get_item_as_string("local_server", "server_port", "7300");
+	nfc.nf_hash    = this->get_uniq_id();
+	nfc.nf_cluster = cr.get_item_as_string("local_server", "cluster", "p2v test cluster");
+	nf = net_find_create(&nfc);
+
+	//Добавляем удаленные сервера и параметры вещательных запросов
+	for (CfgReaderIterator it=cr.get_cfg_items("discover", "remote_server");it!=cr.end();it++) {
+		std::string srv = it->to_string();
+		std::string port = nfc.nf_port;
+		CfgReaderIterator it_port = it->get_cfg_items("port");
+		if (it->end() != it_port)
+			port = it_port->to_string();
+		nf->add_scanable_server(srv, port);
+	}
+	for (CfgReaderIterator it=cr.get_cfg_items("discover", "broadcast_server");it!=cr.end();it++) {
+		//std::string srv = it->to_string();
+		std::string port = nfc.nf_port;
+		CfgReaderIterator it_port = it->get_cfg_items("port");
+		if (it->end() != it_port)
+			port = it_port->to_string();
+		nf->add_broadcast_servers(port); //FIXME Вещательные запросы должны рассылаться по маске с учетом сетевого интерфейса и его алиасов
+	}
+
+	//Добавляем потоки
+	for (CfgReaderIterator it=cr.get_cfg_items("streams", "stream");it!=cr.end();it++) {
+		stream_config stream_cfg;
+		stream_cfg.name = it->to_string();
+		stream_cfg.direction = stream_direction_bidir;
+		stream_cfg.order = stream_msg_order_any;
+		stream_cfg.type = stream_type_dgram;
+		CfgReaderIterator it_dir = it->get_cfg_items("direction");
+		if (it->end() != it_dir) {
+			string dir = it_dir->to_string();
+			if ("input" == dir) {
+				stream_cfg.direction = stream_direction_income;
+			} else if ("output" == dir) {
+				stream_cfg.direction = stream_direction_outcome;
+			} else if ("bidir" == dir) {
+				stream_cfg.direction = stream_direction_bidir;
+			} else {
+				stream_cfg.direction = stream_direction_loopback;
+			}
+		}
+		CfgReaderIterator it_order = it->get_cfg_items("integrity");
+		if (it->end() != it_order) {
+			string order = it_order->to_string();
+			if ("complete" == order) {
+				stream_cfg.order = stream_msg_order_strict;
+			} else if ("chrono" == order) {
+				stream_cfg.order = stream_msg_order_chrono;
+			} else {
+				stream_cfg.order = stream_msg_order_any;
+			}
+		}
+		CfgReaderIterator it_proto = it->get_cfg_items("protocol");
+		if (it->end() != it_proto) {
+			string proto = it_proto->to_string();
+			if ("flow" == proto) {
+				stream_cfg.type = stream_type_flow;
+			} else {
+				stream_cfg.type = stream_type_dgram;
+			}
+		}
+		register_stream(stream_cfg);
+	}
+
 	if (0 != pthread_mutex_init(&mtx, NULL)) {
 		cout << "P2Vera::P2Vera error - couldn`t create mutex. Fatal." << endl;
 		exit(1);
@@ -95,6 +177,7 @@ void P2Vera::rcv_thread() {
 		pfd[fd_cnt].fd = it->first;
 		pfd[fd_cnt].events = POLLIN | POLLHUP;
 		pfd[fd_cnt].revents = 0;
+		fd_cnt++;
 	}
 	pthread_mutex_unlock(&mtx);
 	unsigned char rcv_buf[MAX_RSP_RCV_BUFLEN] = {0};
@@ -165,7 +248,7 @@ void P2Vera::create_netfind() {
 	net_find_config nfc;
 	nfc.nf_caption = "NetFind test";
 	nfc.nf_name    = "nf_test";
-	nfc.nf_address = "127.0.01"; //В тестовом режиме запускаемся на локалхосте
+	nfc.nf_address = "127.0.0.1"; //В тестовом режиме запускаемся на локалхосте
 	nfc.nf_port    = "7300";
 	nfc.nf_hash    = this->get_uniq_id();
 	nfc.nf_cluster = "netfind-test-cluster";

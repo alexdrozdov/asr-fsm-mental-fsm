@@ -38,6 +38,12 @@ using namespace std;
 using namespace p2vera;
 using namespace netfind;
 
+#ifdef DBG_PRINT
+#define _D(str) str
+#else
+#define _D(str) {}
+#endif
+
 
 _rmt_ping& _rmt_ping::operator=(const _rmt_ping& rmtp) {
 	ping_id = rmtp.ping_id;
@@ -134,7 +140,7 @@ int NetFind::register_dgram_stream(_stream_config& stream_cfg, IP2VeraStreamHub*
 	sfc.local_sa.sin_family = AF_INET;
 	sfc.local_sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	cout << "NetFind::register_dgram_stream info - поиск свободного порта для " << stream_cfg.name << endl;
+	_D(cout << "NetFind::register_dgram_stream info - поиск свободного порта для " << stream_cfg.name << endl);
 	int rc = -1;
 	sfc.port =  server_port + 10;
 	while (rc < 0) {
@@ -147,6 +153,7 @@ int NetFind::register_dgram_stream(_stream_config& stream_cfg, IP2VeraStreamHub*
 		sfc.local_sa.sin_port = htons((unsigned short)sfc.port);
 		rc = bind(sfc.sock_fd, (struct sockaddr *)&sfc.local_sa, sizeof(sockaddr_in));
 	}
+	_D(cout << "NetFind::register_dgram_stream info - binded stream " << stream_cfg.name << " at port " << sfc.port << endl);
 
 	sfc.sh = sh;
 	streams.push_back(sfc);
@@ -197,10 +204,12 @@ int NetFind::register_stream(_stream_config& stream_cfg, IP2VeraStreamHub* sh) {
 
 void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint& re) {
 	if (stream_type_dgram == re.str_type) {
+		_D(cout << "NetFind::register_remote_endpoint info - requested to register dgram stream " << stream_name << endl);
 		pthread_mutex_lock(&mtx);
 		list<stream_full_cfg>::iterator it = find_stream(stream_name);
 		if (streams.end() == it) { //Такой поток не зарегистрирован.
 			pthread_mutex_unlock(&mtx);
+			_D(cout << "NetFind::register_remote_endpoint info - stream " << stream_name << " is undefined" << endl);
 			return;
 		}
 		stream_full_cfg& sfc = *it;
@@ -209,6 +218,7 @@ void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint&
 		for (list<remote_endpoint>::iterator re_it=sfc.remote_endpoints.begin();re_it!=sfc.remote_endpoints.end();re_it++) {
 			if (re_it->rsu == re.rsu) { //Такой сервер уже обработан и зарегистрирован
 				pthread_mutex_unlock(&mtx);
+				_D(cout << "NetFind::register_remote_endpoint info - stream " << stream_name << " was allready aasociated with hub" << endl);
 				return;
 			}
 		}
@@ -216,11 +226,13 @@ void NetFind::register_remote_endpoint(std::string stream_name, remote_endpoint&
 		if (NULL == sfc.sh) {
 			cout << "NetFind::register_remote_endpoint error - zero pointer to stream hub" << endl;
 			pthread_mutex_unlock(&mtx);
+			_D(cout << "NetFind::register_remote_endpoint info - stream " << stream_name << " is undefined" << endl);
 			return;
 		}
 		sfc.sh->add_message_target(re.rsu, re.remote_port);
 		pthread_mutex_unlock(&mtx);
 	} else if (stream_type_flow == re.str_type) {
+		_D(cout << "NetFind::register_remote_endpoint info - requested to register dgram stream " << stream_name << endl);
 		pthread_mutex_lock(&mtx);
 		list<stream_full_cfg>::iterator it = find_stream(stream_name);
 		if (streams.end() == it) { //Такой поток не зарегистрирован.
@@ -495,7 +507,7 @@ bool NetFind::bind_client_port() {
 	clientaddr.sin_family = AF_INET;
 	clientaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	cout << "NetFind::client_thread info - поиск свободного порта..." << endl;
+	_D(cout << "NetFind::client_thread info - поиск свободного порта..." << endl);
 	int rc = -1;
 	client_port = server_port;
 	while (rc < 0) {

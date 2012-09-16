@@ -4,7 +4,8 @@
 [local_server]
 name = "p2v_rcv"
 caption = "P2Vera Message Listener"
-claster = "default"
+cluster = "netfind-test-cluster"
+address = "127.0.0.1"
 hash = ""
 server_port = 7300
 min_client_port = 7301
@@ -15,18 +16,32 @@ start_network = false
 
 #Настройки обнаружения сервером других серверов и видимости сервера для других серверов
 [discover]
-remote_server = "192.168.0.17:7300"
-remote_server = "192.168.0.18"
-broadcast_server = "127.0.0.1"
-broadcast_server = "192.168.0.0"
-restrict = "192.168.0.19"
+remote_server = "127.0.0.1"
+	port = 7300
+	required = true
+	interface = "lo"
+#broadcast_server = ""
+#	check_network_reachable = true;
+#	interface = "all"
+#	port = 7300
 
 #Список потоков, которые видит сервер по-умолчанию
 [streams]
 allow_append = true
 stream = "base"
+#	direction = "input"
+	integrity = "any"
+	interface = "eth0"
+	protocol = "dgram"
 stream = "error"
-stream = "info"
-stream = "warning"
-restrict = "hello"
+#	direction = "input"
+#	integrity = "any"
+#	interface = "all"
+#stream = "info"
+#stream = "warning"
+#stream = "hello"
+#	direction = "input"
+#	integrity = "chrono"
+#	protocol = "dgram"
+
 

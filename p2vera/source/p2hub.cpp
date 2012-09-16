@@ -19,6 +19,12 @@
 
 using namespace std;
 
+#ifdef DBG_PRINT
+#define _D(str) str
+#else
+#define _D(str) {}
+#endif
+
 IP2VeraStreamHub::~IP2VeraStreamHub() {
 }
 
@@ -64,10 +70,6 @@ P2VeraStream P2VeraStreamHub::create_instream() {
 	P2VeraStreamQq* qq = new P2VeraInStreamQq(this);
 	P2VeraStream vs(qq);
 	pthread_mutex_lock(&mtx);
-	//P2VeraStream vs_empty((P2VeraStreamQq*)0xFFFFFFFF);
-	//qqs.push_back(vs_empty);
-	//list<P2VeraStream>::reverse_iterator it = qqs.rbegin();
-	//*it = vs;
 	qqs.push_back(vs);
 	pthread_mutex_unlock(&mtx);
 	return vs;
@@ -98,6 +100,7 @@ bool P2VeraStreamHub::send_message(IP2VeraMessage& p2m) {
 	p2m.get_data(data);
 	P2VeraBasicMessage p2bm(p2m);
 	//Сначала рассылаем сообщение всем очередям, которые подключены к этому хабу
+	_D(cout << "P2VeraStreamHub::send_message info - launched for hub " << name << endl);
 	pthread_mutex_lock(&mtx);
 	for (list<P2VeraStream>::iterator it=qqs.begin();it!=qqs.end();it++) {
 		IP2VeraStreamQq& qq = *(it->get_qq());
@@ -140,7 +143,7 @@ bool P2VeraStreamHub::receive_message(IP2VeraMessage& p2m) {
 }
 
 bool P2VeraStreamHub::add_message_target(RemoteSrvUnit rsu, int port) {
-	//cout << "P2VeraStreamHub::add_message_target info - launched for " << rsu.get_uniq_id() << " at port " << port << endl;
+	_D(cout << "P2VeraStreamHub::add_message_target info - launched for " << rsu.get_uniq_id() << " at port " << port << endl);
 	pthread_mutex_lock(&mtx);
 	remote_hub rh;
 	rh.rsu = rsu;
@@ -154,7 +157,7 @@ bool P2VeraStreamHub::add_message_target(RemoteSrvUnit rsu, int port) {
 }
 
 bool P2VeraStreamHub::remove_message_target(RemoteSrvUnit rsu) {
-	cout << "P2VeraStreamHub::remove_message_target info - launched for " << rsu.get_uniq_id() << endl;
+	_D(cout << "P2VeraStreamHub::remove_message_target info - launched for " << rsu.get_uniq_id() << endl);
 	pthread_mutex_lock(&mtx);
 	for (list<remote_hub>::iterator rh_it=remote_hubs.begin();rh_it!=remote_hubs.end();) {
 		if (rh_it->rsu != rsu) {
@@ -162,7 +165,7 @@ bool P2VeraStreamHub::remove_message_target(RemoteSrvUnit rsu) {
 			continue;
 		}
 		rh_it = remote_hubs.erase(rh_it);
-		cout << "P2VeraStreamHub::remove_message_target info - removed for udp" << endl;
+		_D(cout << "P2VeraStreamHub::remove_message_target info - removed for udp" << endl);
 	}
 	for (list<TcpStream>::iterator tc_it=tcsl.begin();tc_it!=tcsl.end();) {
 		if (!tc_it->compare_remote_server(rsu)) {
@@ -170,7 +173,7 @@ bool P2VeraStreamHub::remove_message_target(RemoteSrvUnit rsu) {
 			continue;
 		}
 		tc_it = tcsl.erase(tc_it);
-		cout << "P2VeraStreamHub::remove_message_target info - removed for tcp" << endl;
+		_D(cout << "P2VeraStreamHub::remove_message_target info - removed for tcp" << endl);
 	}
 	pthread_mutex_unlock(&mtx);
 	return true;

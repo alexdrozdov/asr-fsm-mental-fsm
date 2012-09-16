@@ -97,7 +97,7 @@ int main(int argc, const char *argv[]) {
 		return 0;
 	}
 
-	P2Vera* p2v = new P2Vera();
+	P2Vera* p2v = new P2Vera("./rcv_cfg.p2v");
 
 	map<int, P2VeraStream> stream_fd;
 
@@ -105,13 +105,6 @@ int main(int argc, const char *argv[]) {
 	pollfd *pfd = new pollfd[fd_count];
 	int fd_cnt = 0;
 	for (list<string>::iterator it = run_options.streams.begin();it!=run_options.streams.end();it++) {
-		stream_config stream_cfg;
-		stream_cfg.name = *it;
-		stream_cfg.direction = stream_direction_income;
-		stream_cfg.order = stream_msg_order_strict;
-		stream_cfg.type = stream_type_flow;
-		p2v->register_stream(stream_cfg);
-
 		P2VeraStream p2s = p2v->create_instream(*it);
 		int fd = p2s.get_fd();
 		stream_fd[fd] = p2s;
