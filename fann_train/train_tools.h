@@ -8,7 +8,7 @@
 #ifndef TRAIN_TOOLS_H_
 #define TRAIN_TOOLS_H_
 
-#include <fann.h>
+#include <floatfann.h>
 
  struct train_row {
 	train_row();

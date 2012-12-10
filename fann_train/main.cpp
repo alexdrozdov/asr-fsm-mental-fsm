@@ -43,6 +43,7 @@ bool validate_run_options() {
 
 int main(int argc, char *argv[]) {
 	executable_path = get_executable_path(argv[0]);
+	project_path = get_current_working_path();
 	fill_option_handlers();
 	prepare_run_options();
 	parse_options(argc,argv);
@@ -56,9 +57,13 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
+	if (run_options.mode_script) {
+		run_script(argc, argv);
+		return 0;
+	}
+
 	if (run_options.mode_interactive) {
-		initialize_interactive(argc, argv);
-		run_interactive();
+		run_interactive(argc, argv);
 		return 0;
 	}
 

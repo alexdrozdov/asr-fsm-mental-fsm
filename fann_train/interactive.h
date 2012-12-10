@@ -10,9 +10,8 @@
 
 #include <string>
 
-
-extern void initialize_interactive(int argc, char *argv[]);
-extern void run_interactive();
+extern void run_interactive(int argc, char *argv[]);
+extern void run_script(int argc, char *argv[]);
 
 
 typedef struct _fann_options {

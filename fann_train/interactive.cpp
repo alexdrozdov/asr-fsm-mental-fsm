@@ -28,6 +28,7 @@ using namespace std;
 using namespace fann_train_cfg;
 
 int Tcl_AppInit (Tcl_Interp *interp);
+int Tcl_AppInitScript (Tcl_Interp *interp);
 void create_procs(Tcl_Interp *interp);
 
 int fann_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
@@ -66,6 +67,7 @@ struct train_entry {
 typedef struct _project_info {
 	std::string name;
 	std::string file_name;
+	std::string path;
 
 	bool loaded;
 	bool file_name_present;
@@ -84,9 +86,6 @@ bool load_input_entry_data(train_entry *ten);
 bool load_output_entry_data(train_entry *ten);
 bool load_project(std::string file_name);
 
-void initialize_interactive(int argc, char *argv[]) {
-	Tcl_Main(1, argv, Tcl_AppInit);
-}
 
 int train_io::entries_count() {
 	switch(type) {
@@ -150,7 +149,12 @@ void train_entry::to_train_rows(std::vector<train_row>& to) {
 	}
 }
 
-void run_interactive() {
+void run_script(int argc, char *argv[]) {
+	Tcl_Main(1, argv, Tcl_AppInitScript);
+}
+
+void run_interactive(int argc, char *argv[]) {
+	Tcl_Main(1, argv, Tcl_AppInit);
 }
 
 void create_procs(Tcl_Interp *interp) {
@@ -202,6 +206,34 @@ int Tcl_AppInit (Tcl_Interp *interp) {
 
     if (run_options.load_project)
     	load_project(build_file_path(run_options.project_file));
+
+    return TCL_OK;
+}
+
+int Tcl_AppInitScript (Tcl_Interp *interp) {
+
+	Tcl_Eval(interp,
+"proc tclInit { } {\n"
+"global tcl_library\n"
+"set current_dir [file dirname [info nameofexecutable]]\n"
+"set tclfile [file join $current_dir library init.tcl]\n"
+"set tcl_library [file join $current_dir library]\n"
+"}\n"
+"tclInit\n");
+
+    if (Tcl_Init(interp) == TCL_ERROR) {
+    	return TCL_ERROR;
+    }
+
+    create_procs(interp);
+    string script_path = build_file_path(run_options.script_file_name);
+    size_t last_slash = script_path.rfind('/');
+    project_path = script_path.substr(0,last_slash+1);
+
+    string str_source_cmd = "source \"";
+    str_source_cmd += script_path;
+    str_source_cmd += "\"\n";
+    Tcl_Eval(interp, str_source_cmd.c_str());
 
     return TCL_OK;
 }
@@ -412,13 +444,13 @@ bool save_fann() {
 		return false;
 	}
 
-	fann_save(ann, fann_opts.file_name.c_str());
+	fann_save(ann, build_project_path(fann_opts.file_name).c_str());
 
 	return true;
 }
 
 bool load_fann(std::string file_name) {
-	file_name = build_file_path(file_name);
+	file_name = build_project_path(file_name);
 	ann = fann_create_from_file(file_name.c_str());
 	if (NULL == ann) {
 		cout << "load_fann error - не удалось загрузить нейронную сеть из файла " << file_name << endl;
@@ -724,7 +756,7 @@ bool load_input_entry_data(train_entry *ten) {
 		return false;
 	}
 
-	ifstream ifs (ten->input.file_name.c_str() , ifstream::in);
+	ifstream ifs (build_project_path(ten->input.file_name).c_str() , ifstream::in);
 	if (!ifs.is_open()) {
 		cout << "load_entry_data error - не удалось загрузить данные из файла " << ten->input.file_name << endl;
 		return false;
@@ -782,7 +814,7 @@ bool load_output_entry_data(train_entry *ten) {
 		return false;
 	}
 
-	ifstream ifs (ten->output.file_name.c_str() , ifstream::in);
+	ifstream ifs (build_project_path(ten->output.file_name).c_str() , ifstream::in);
 	if (!ifs.is_open()) {
 		cout << "load_entry_data error - не удалось загрузить данные из файла " << ten->output.file_name << endl;
 		return false;
@@ -819,6 +851,11 @@ bool add_entry (int argc, const char *argv[]) {
 		cout << "add_entry error - не задано количество входов и/или выходов нейронной сети" << endl;
 		return false;
 	}
+	if (0 == argc) {
+		cout << "data add error - no options specified. Usage:" << endl;
+		cout << "data add [-input file-name]|[-inputs {values array}] ?-regexp expression? [-output file-name]|[-outputs {values array}] ?-regexp expression?" << endl;
+		return true;
+	}
 	train_entry ten;
 	vector<string> args;
 	for (int i=0;i<argc;i++) {
@@ -835,13 +872,13 @@ bool add_entry (int argc, const char *argv[]) {
 
 	int nused_args = 1;
 
-	if ("-input" == args[nused_args]) {
+	if (nused_args<argc && "-input" == args[nused_args]) {
 		//Вход задан как файл с входными параметрами
 		ten.input.type = iot_file;
 		ten.input.file_name = args[nused_args+1];
 
 		nused_args += 2;
-	} else if ("-inputs" == args[nused_args]) {
+	} else if (nused_args<argc && "-inputs" == args[nused_args]) {
 		//Входы заданы в виде единого списка для любого выходного параметра
 		ten.input.type = iot_vect;
 		split_to_double(args[nused_args+1],' ', ten.input.values);
@@ -851,25 +888,31 @@ bool add_entry (int argc, const char *argv[]) {
 		}
 
 		nused_args += 2;
-	} else if ("-file" == args[nused_args]) {
+	} else if (nused_args<argc && "-file" == args[nused_args]) {
 		//Входы и выходы заданы в одном единственном файле
+	} else if (nused_args>=argc) {
+		cout << "data add error - неверный формат команды" << endl;
+		return false;
 	} else {
 		cout << "Ошибка. Неизвестный тип входа" << endl;
 		return false;
 	}
 
-	if ("-regexp" == args[nused_args]) {
+	if (nused_args<argc && "-regexp" == args[nused_args]) {
 		ten.input.extract_regex = args[nused_args+1];
 		nused_args += 2;
+	} else if (nused_args>=argc){
+		cout << "Ошибка. Неизвестный тип входа" << endl;
+		return false;
 	} else {
 		ten.input.extract_regex = fann_opts.def_in_regexp;
 	}
 
-	if ("-output" == args[nused_args]) {
+	if (nused_args<argc && "-output" == args[nused_args]) {
 		//Вход задан как файл с входными параметрами
 		ten.output.type = iot_file;
 		ten.output.file_name = args[nused_args+1];
-	} else if ("-outputs" == args[nused_args]) {
+	} else if (nused_args<argc && "-outputs" == args[nused_args]) {
 		//Выходы заданы в виде единого списка для любого выходного параметра
 		ten.output.type = iot_vect;
 		split_to_double(args[nused_args+1],' ', ten.output.values);
@@ -877,12 +920,15 @@ bool add_entry (int argc, const char *argv[]) {
 			cout << "add_entry error - количество выходных значений не соответсвует количеству выходов нейронной сети" << endl;
 			return false;
 		}
+	} else if (nused_args>=argc){
+		cout << "data add error - неверный формат команды" << endl;
+		return false;
 	} else {
 		cout << "Ошибка. Неизвестный тип выхода" << endl;
 		return false;
 	}
 
-	if ("-regexp" == args[nused_args]) {
+	if (nused_args<argc && "-regexp" == args[nused_args]) {
 		ten.output.extract_regex = args[nused_args+1];
 		nused_args += 2;
 	} else {
@@ -993,7 +1039,7 @@ void save_project() {
 
 
 
-	fstream output(project.file_name.c_str(), ios::out | ios::trunc | ios::binary);
+	fstream output(build_project_path(project.file_name).c_str(), ios::out | ios::trunc | ios::binary);
 	if (!ftp.SerializeToOstream(&output)) {
 	  cerr << "Не удалось сохранить проект в файл " << project.file_name << endl;
 	  return;
@@ -1010,6 +1056,10 @@ void saveas_project(std::string file_name) {
 }
 
 bool load_project(std::string file_name) {
+	file_name = build_project_path(file_name); //Определяем полный путь к файлу проекта
+	size_t last_slash = file_name.rfind('/');
+	project_path = file_name.substr(0,last_slash+1); //Переносим рабочий каталог в папку с проектом
+
 	fann_train_cfg::FannTrainProject ftp;
 	fstream input(file_name.c_str(), ios::in | ios::binary);
 	if (!input) {
@@ -1169,14 +1219,13 @@ int data_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 	}
 
 	Tcl_SetResult(interp, (char*)"wrong options. Usage:\n"
-"-file - файл, содержащий строки с входами и выходами\n"
-"-input - файл, содержащий строки с входами\n"
-"-inputs {} -единый набор входов, которому может быть соспоставлено все что угодно\n"
-"-regexp - регулярное выражение, по котрому извлекются данные из файла\n"
-"-output - файл содержащий соответсвующие строки с выходами\n"
-"-outputs {} - единый набор выходов, сопоставленный одному файлу\n"
-"-regexp - регулярное выражение, по котрому извлекются данные из файла"
-			, TCL_STATIC);
+			"list   - вывести список зарегистрированных наборов данных\n"
+			"remove - удалить набор данных по его имени\n"
+			"reload - перезагрузить набор данных, связанный с внешним файлом\n"
+			"show   - отобразить основную информацию об указанном наборе данных\n"
+			"dump   - вывести содержимое указанного набора данных\n"
+			"add    - создать новый набор данных\n",
+			TCL_STATIC);
 	return TCL_ERROR;
 }
 
@@ -1208,6 +1257,10 @@ int project_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST c
 			save_project();
 			return TCL_OK;
 		}
+		if ("path" == args[1]) {
+			Tcl_SetResult(interp, (char*)project_path.c_str(), TCL_VOLATILE);
+			return TCL_OK;
+		}
 	}
 
 	if (3 == argc) {
@@ -1223,6 +1276,10 @@ int project_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST c
 		}
 		if ("load" == args[1]) {
 			return load_project(args[2])?TCL_OK:TCL_ERROR;
+		}
+		if ("path" == args[1]) {
+			project_path = build_file_path(args[2]);
+			return TCL_OK;
 		}
 	}
 	Tcl_SetResult(interp, (char*)"wrong options. Usage project file|save|(saveas filename)|(load filename)", TCL_STATIC);
