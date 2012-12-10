@@ -74,8 +74,9 @@ typedef struct _option_handler_desc {
 } option_handler_desc;
 
 extern std::string get_executable_path(char* argv0);
+extern std::string get_current_working_path();
 extern std::string build_file_path(std::string fpath);
-extern std::string build_project_path(string fpath);
+extern std::string build_project_path(std::string fpath);
 
 extern int parse_options(int argc, char *argv[]);
 extern void add_option_handler(option_handler_desc ohd);
@@ -84,5 +85,6 @@ extern std::string build_version_date(unsigned int d, bool str, bool hex);
 extern std::string build_device_type(unsigned int t, bool str, bool hex);
 
 extern std::string executable_path;
+extern std::string project_path;
 
 #endif /* COMMON_H_ */

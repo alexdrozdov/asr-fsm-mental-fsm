@@ -46,7 +46,7 @@ std::string build_file_path(string fpath) {
 	return full_path;
 }
 
-std::string build_project_path(string fpath) {
+std::string build_project_path(std::string fpath) {
 	if ('.' == fpath[0]) {
 		fpath = fpath.substr(1);
 	}
