@@ -107,11 +107,12 @@ else
 	fi
 	LIBS="$LIBS -lfloatfann"
 	
-	AC_CHECK_LIB([tcl], [main], [libtcl_found="yes"], [libtcl_found="no"])
+	AC_CHECK_LIB([tcl8.5], [main], [libtcl_found="yes"], [libtcl_found="no"])
 	if test "$libtcl_found" = "no" ; then
 		AC_MSG_ERROR([Tcl libraries not found])
 	fi
-	LIBS="$LIBS -ltcl"
+	LIBS="$LIBS -ltcl8.5"
+	includes="-I /usr/include/tcl8.5/"
 fi
 
 build_dir="./obj"

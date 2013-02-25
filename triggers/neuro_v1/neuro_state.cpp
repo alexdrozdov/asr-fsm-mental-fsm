@@ -274,6 +274,14 @@ void CNeuroState::copy_outputs() {
 	}
 }
 
+float CNeuroState::FannOutput(int i) {
+	if (i >= output_count) {
+		cout << "CNeuroState::FannOutput error - input number " << i << " is out of range 0..." << output_count-1 << endl;
+		return 0;
+	}
+	return fann_output[i];
+}
+
 void CNeuroState::ProcessInputs() {
 	evalute_fann_output();
 
@@ -287,6 +295,7 @@ void CNeuroState::ProcessInputs() {
 			next_state_id = i;
 		}
 	}
+	//cout << "CNeuroState::ProcessInputs info - next state id " << next_state_id << endl;
 	//cout << endl;
 
 	//Копириуем оставшиеся результаты работы сети на выходы триггера
