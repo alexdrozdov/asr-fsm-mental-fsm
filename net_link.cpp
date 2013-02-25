@@ -312,38 +312,6 @@ int CNetLink::process_message(unsigned char* buf, int len) {
 	if (pkg.modified_triggers_inst_size() > 0) {
 		err += process_trig_msg(pkg.modified_triggers_inst(0));
 	}
-//	int msg_type = *(int*)buf;
-//	int msg_len  = *(int*)(buf+4);
-//
-//	//Проверяем длину сообщения
-//	if (msg_len != len-2) {
-//		cout << "CNetLink::process_message atacked - wrong message length specified" << endl;
-//		cout << "Will now exit" << endl;
-//		exit(4);
-//	}
-//	//Длина сообщения, заданная в самом сообщении совпадает с полученной длиной фрейма
-//
-//	//Разбираем сообщение по его типу
-//	switch (msg_type) {
-//		case nlmt_link:
-//			return process_link_msg(buf, len);
-//			break;
-//		case nlmt_security:
-//			return process_sec_msg(buf, len);
-//			break;
-//		case nlmt_time:
-//			return process_time_msg(buf, len);
-//			break;
-//		case nlmt_trig:
-//			return process_trig_msg(buf, len);
-//			break;
-//		case nlmt_tcl:
-//			break;
-//		default:
-//			cout << "CNetLink::process_message atacked - unknown message type" << endl;
-//			cout << "Will now exit" << endl;
-//			exit(4);
-//	}
 	return err;
 }
 
@@ -351,6 +319,24 @@ int CNetLink::process_trig_msg(const ::dsp::modified_triggers& mt) {
 	::google::protobuf::RepeatedPtrField< ::dsp::modified_triger>::const_iterator ctit;
 	for (ctit=mt.items().begin();ctit!=mt.items().end();ctit++) {
 		const ::dsp::modified_triger& mmt = *ctit;
+		if (dump_enabled && dump_to_file) {
+			dump_stream << "CNetLink::process_trig_msg info - trigger id: " << mmt.id() << "; outputs size: " << mmt.outputs_size();
+			dump_stream << "; outputs: ";
+			::google::protobuf::RepeatedPtrField< ::dsp::trigger_output>::const_iterator coit;
+			for (coit=mmt.outputs().begin();coit!=mmt.outputs().end();coit++) {
+				dump_stream << " out[" << coit->out_id() << "]=" << coit->value();
+			}
+			dump_stream << endl;
+		} else if (dump_enabled) {
+			cout << "CNetLink::process_trig_msg info - trigger id: " << mmt.id() << "; outputs size: " << mmt.outputs_size();
+			cout << "; outputs: ";
+			::google::protobuf::RepeatedPtrField< ::dsp::trigger_output>::const_iterator coit;
+			for (coit=mmt.outputs().begin();coit!=mmt.outputs().end();coit++) {
+				cout << " out[" << coit->out_id() << "]=" << coit->value();
+			}
+			cout << endl;
+		}
+
 		if (0 == mmt.outputs_size()) {
 			continue; //Триггер был передан, но не содержит ниодного изменившегося выхода
 		}
@@ -373,6 +359,11 @@ int CNetLink::process_trig_msg(const ::dsp::modified_triggers& mt) {
 
 int CNetLink::process_time_msg(const ::dsp::time_message& tm) {
 	long long new_time = tm.current_time();
+	if (dump_enabled && dump_to_file) {
+		dump_stream << "CNetLink::process_time_msg info - remote time is " << new_time << endl;
+	} else if (dump_enabled) {
+		cout << "CNetLink::process_time_msg info - remote time is " << new_time << endl;
+	}
 	if (new_time < fsm->GetCurrentTime()) {
 		cout << "CNetLink::process_time_msg atacked - time " << new_time << " is less than current time " << fsm->GetCurrentTime() << endl;
 		exit(4);
@@ -382,6 +373,11 @@ int CNetLink::process_time_msg(const ::dsp::time_message& tm) {
 }
 
 int CNetLink::process_samplerate_msg(const ::dsp::samplerate_message& srtm) {
+	if (dump_enabled && dump_to_file) {
+		dump_stream << "CNetLink::process_samplerate_msg info - remote samplerate is " << srtm.samplerate() << endl;
+	} else if (dump_enabled) {
+		cout << "CNetLink::process_samplerate_msg - remote samplerate is " << srtm.samplerate() << endl;
+	}
 	fsm->SetRemoteSamplerate(srtm.samplerate());
 	return 0;
 }

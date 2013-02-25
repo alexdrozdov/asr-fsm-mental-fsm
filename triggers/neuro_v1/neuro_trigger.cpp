@@ -220,14 +220,26 @@ void CNeuroTrigger::handle_values_differences() {
 		for (int i=0;i<out_values_count;i++) {
 			dump_stream << values[i] << " ";
 		}
+
+		dump_stream << " FANN_OUTS ";
+		for (int i=0;i<out_values_count;i++) {
+			dump_stream << state->FannOutput(i) << " ";
+		}
 		dump_stream << "STATE " << state->szCaption;
+		dump_stream << " AT " << fsm->GetCurrentTime();
 		dump_stream << endl;
 	} else if (dump_enabled) {
 		cout << " OUTS ";
 		for (int i=0;i<out_values_count;i++) {
 			cout << values[i] << " ";
 		}
+
+		cout << " FANN_OUTS ";
+		for (int i=0;i<out_values_count;i++) {
+			cout << state->FannOutput(i) << " ";
+		}
 		cout << "STATE " << state->szCaption;
+		cout << " AT " << fsm->GetCurrentTime();
 		cout << endl;
 	}
 	for (int i=0;i<out_values_count;i++) {

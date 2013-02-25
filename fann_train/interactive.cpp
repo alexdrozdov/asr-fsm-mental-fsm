@@ -6,7 +6,7 @@
  */
 
 
-#include "tcl.h"
+#include <tcl.h>
 
 #include <iostream>
 #include <fstream>
@@ -35,6 +35,8 @@ int fann_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 int data_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int train_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int project_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
+
+void test_train_data(std::string train_name);
 
 enum io_type {
 	iot_value = 0,
@@ -576,6 +578,12 @@ int fann_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 			aux_param >> fann_opts.file_name;
 			return TCL_OK;
 		}
+		if ("test" == aux_cmd) {
+			string sample_name;
+			aux_param >> sample_name;
+			test_train_data(sample_name);
+			return TCL_OK;
+		}
 	}
 	Tcl_SetResult(interp, (char*)"wrong options. Usage:\n"
 "inputs        - количество входов нейронной сети\n"
@@ -703,6 +711,53 @@ void dump_train_io(train_io *tio) {
 			cout << endl;
 			break;
 	}
+}
+
+void test_train_data(std::string train_name) {
+	vector<train_entry>::iterator it = find_if(train_entries.begin(),train_entries.end(), check_entry_name(train_name));
+	if (train_entries.end() == it) {
+		return;
+	}
+
+	if (NULL == ann) {
+		cout << "test_train_data error - нейронная сеть еще не создана. Перед проверкой результатов обучения нейронной сети сеть должна быть обучена" << endl;
+		return;
+	}
+	if (!fann_opts.trained) {
+		cout << "test_train_data error - нейронная сеть еще не обучена" << endl;
+		return;
+	}
+	if (!validate_fann_opts()) {
+		cout << "test_train_data error - проверка нейронной сети невозможна, т.к. настройки не прошли контроль" << endl;
+		return;
+	}
+
+	fann_type *fann_input = new fann_type[fann_opts.inputs];
+	fann_type *res = NULL;
+	switch(it->input.type) {
+		case iot_file:
+			for (vector<vector<double> >::iterator sample_it = it->input.fvalues.begin();sample_it != it->input.fvalues.end();sample_it++) {
+				for (int i=0;i<(int)sample_it->size();i++) {
+					fann_input[i] = sample_it->operator [](i);
+				}
+				res = fann_run(ann, fann_input);
+				for (int i=0;i<fann_opts.outputs;i++) {
+					cout << res[i] << " ";
+				}
+				cout << endl;
+			}
+			break;
+		case iot_value:
+			fann_input[0] = it->input.value;
+			res = fann_run(ann, fann_input);
+			break;
+		case iot_vect:
+			cout << "\tvalues: ";
+			for_each(it->input.values.begin(),it->input.values.end(),cout_numeric<double>);
+			cout << endl;
+			break;
+	}
+	delete[] fann_input;
 }
 
 bool dump_data_entry (std::string name) {
