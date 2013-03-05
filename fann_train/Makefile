@@ -1,12 +1,12 @@
 CCP=g++
 CCC=gcc
-PROTOC=protoc
+PROTOC=/Users/drozdov/dev/speech/asr-fsm/mental-fsm/fann_train/../../../aux-packages/build/bin/protoc
 
 PROG=fann_train.bin
 BUILD_DIR=./obj
 
-CFLAGS=-Wall -O0 -g3 -I /usr/include/tcl8.5/ -c 
-LDFLAGS=-lpthread -ldl  -lprotobuf -lpcre -lfloatfann -ltcl8.5
+CFLAGS=-Wall -O0 -g3  -I /Users/drozdov/dev/speech/asr-fsm/mental-fsm/fann_train/../../../aux-packages/build/include/ -c 
+LDFLAGS=-lpthread -ldl  -lprotobuf -L/Users/drozdov/dev/speech/asr-fsm/mental-fsm/fann_train/../../../aux-packages/build/lib/ -lpcre -lfloatfann -ltcl
 
 SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
@@ -15,7 +15,7 @@ PROTO=$(wildcard *.proto)
 PROTO_CC=$(PROTO:%.proto=%.pb.cc)
 PROTO_OBJ=$(PROTO_CC:%.cc=./obj/%.o)
 
-all:$(BUILD_DIR)/$(PROG) install.gnulinux
+all:$(BUILD_DIR)/$(PROG) install.macos
 
 $(BUILD_DIR)/$(PROG): dirs $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 	@echo [LD] $(PROG); \
