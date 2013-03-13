@@ -22,6 +22,7 @@
 #include "common.h"
 #include "interactive.h"
 #include "fann_handlers.h"
+#include "project_handlers.h"
 #include "cfg_serialize.pb.h"
 #include "train_tools.h"
 
@@ -37,7 +38,7 @@ int data_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 int train_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int project_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 
-project_info project;
+extern project_info project;
 extern fann *ann;
 
 bool load_input_entry_data(train_entry *ten);
@@ -51,6 +52,7 @@ int train_io::entries_count() {
 		case iot_vect:
 			return 1;
 		case iot_file:
+		case iot_matrix:
 			return (int)fvalues.size();
 	}
 	return 0;
@@ -62,6 +64,7 @@ int train_io::entry_size() {
 		case iot_vect:
 			return (int)values.size();
 		case iot_file:
+		case iot_matrix:
 			return (int)fvalues[0].size();
 	}
 	return 0;
@@ -80,6 +83,7 @@ fann_type* train_io::to_mem(int nrow) {
 				v[i] = (fann_type)values[i];
 			break;
 		case iot_file:
+		case iot_matrix:
 			v = new fann_type[fvalues[0].size()];
 			std::vector<double>& val_row = fvalues[nrow];
 			for (int i=0;i<(int)val_row.size();i++)
@@ -244,12 +248,22 @@ void test_train_data(std::string train_name) {
 	delete[] fann_input;
 }
 
-
-
 int train_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
 	return TCL_OK;
 }
 
+
+check_entry_name::check_entry_name(std::string name) {
+	n = name;
+}
+
+bool check_entry_name::operator()(train_entry &ten) {
+	return ten.name == n;
+}
+
+template<class T> void cout_numeric(T v) {
+	cout << " " << v;
+}
 
 
 fann_options fann_opts;

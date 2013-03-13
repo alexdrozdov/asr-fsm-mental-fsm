@@ -232,4 +232,3 @@ string build_device_type(unsigned int t, bool str=true, bool hex=false) {
 
 
 
-
