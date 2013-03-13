@@ -35,9 +35,10 @@ typedef struct _fann_options {
 
 
 enum io_type {
-	iot_value = 0,
-	iot_file  = 1,
-	iot_vect  = 2
+	iot_value  = 0,
+	iot_file   = 1,
+	iot_vect   = 2,
+	iot_matrix = 3
 };
 
 typedef struct _train_io {
@@ -72,6 +73,14 @@ typedef struct _project_info {
 	bool saved;
 } project_info;
 
+class check_entry_name {
+	std::string n;
+public:
+	check_entry_name(std::string name);
+	bool operator()(train_entry &ten);
+};
+
+template<class T> void cout_numeric(T v);
 
 extern std::vector<train_row> train_rows;
 extern std::vector<train_entry> train_entries;

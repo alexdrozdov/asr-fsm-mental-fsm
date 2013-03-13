@@ -6,15 +6,22 @@
  */
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <vector>
 #include <string>
 
+#include "common.h"
 #include "cfg_serialize.pb.h"
 #include "interactive.h"
 #include "project_handlers.h"
+#include "fann_handlers.h"
+#include "data_handlers.h"
 
 using namespace std;
 using namespace fann_train_cfg;
+
+project_info project;
 
 void save_project() {
 	if (!project.file_name_present) {
@@ -72,6 +79,16 @@ void save_project() {
 					}
 				}
 				break;
+			case iot_matrix:
+				tio->set_type(FannTrainProject_TrainIo_IoType_IOT_MARIX);
+				tio->set_extract_regex(ten.input.extract_regex);
+				for (vector< vector<double> >::iterator fit=ten.input.fvalues.begin();fit!=ten.input.fvalues.end();fit++) {
+					FannTrainProject_TrainIo_FValues* fv = tio->add_fvalues();
+					for (vector<double>::iterator dit=fit->begin();dit!=fit->end();dit++) {
+						fv->add_values(*dit);
+					}
+				}
+				break;
 			case iot_vect:
 				tio->set_type(FannTrainProject_TrainIo_IoType_IOT_VECTOR);
 				for (vector<double>::iterator dit=ten.input.values.begin();dit!=ten.input.values.end();dit++) {
@@ -89,6 +106,16 @@ void save_project() {
 			case iot_file:
 				tio->set_type(FannTrainProject_TrainIo_IoType_IOT_FILE);
 				tio->set_file_name(ten.output.file_name);
+				tio->set_extract_regex(ten.output.extract_regex);
+				for (vector< vector<double> >::iterator fit=ten.output.fvalues.begin();fit!=ten.output.fvalues.end();fit++) {
+					FannTrainProject_TrainIo_FValues* fv = tio->add_fvalues();
+					for (vector<double>::iterator dit=fit->begin();dit!=fit->end();dit++) {
+						fv->add_values(*dit);
+					}
+				}
+				break;
+			case iot_matrix:
+				tio->set_type(FannTrainProject_TrainIo_IoType_IOT_MARIX);
 				tio->set_extract_regex(ten.output.extract_regex);
 				for (vector< vector<double> >::iterator fit=ten.output.fvalues.begin();fit!=ten.output.fvalues.end();fit++) {
 					FannTrainProject_TrainIo_FValues* fv = tio->add_fvalues();
@@ -178,6 +205,7 @@ bool load_project(std::string file_name) {
 				ten.input.value = fte.input().value();
 				break;
 			case iot_file:
+			case iot_matrix:
 				{
 					ten.input.extract_regex = fte.input().extract_regex();
 					::google::protobuf::RepeatedPtrField< ::fann_train_cfg::FannTrainProject_TrainIo_FValues >::const_iterator it;
@@ -204,6 +232,7 @@ bool load_project(std::string file_name) {
 				ten.output.value = fte.output().value();
 				break;
 			case iot_file:
+			case iot_matrix:
 				{
 					ten.output.extract_regex = fte.output().extract_regex();
 					::google::protobuf::RepeatedPtrField< ::fann_train_cfg::FannTrainProject_TrainIo_FValues >::const_iterator it;

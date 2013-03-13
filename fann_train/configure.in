@@ -49,7 +49,7 @@ AC_ARG_WITH(aux-protobuf, [Use local copy for Google Protocol Buffers. By defaul
                           [use_aux_protobuf="0"], \
                           [use_aux_protobuf="1"])
                           
-if test "$use_aux_protobuf" = "0" || test "$is_darwin" = "0" ; then
+if test "$is_darwin" = "0" ; then
 	AC_MSG_RESULT([local])
 	export LD_LIBRARY_PATH=$DIR_PROTOBUF_LIB_DEFAULT
 	AC_CHECK_LIB([protobuf], [main], [libprotobuf_found="yes"], [libprotobuf_found="no"])
@@ -81,7 +81,39 @@ if test "$use_aux_protobuf" = "0" || test "$is_darwin" = "0" ; then
 		AC_MSG_ERROR([Tcl libraries not found])
 	fi
 	LIBS="$LIBS -ltcl"
-else
+elif test "$use_aux_protobuf" = "0" ; then
+	AC_MSG_RESULT([local])
+	export LD_LIBRARY_PATH=$DIR_PROTOBUF_LIB_DEFAULT
+	AC_CHECK_LIB([protobuf], [main], [libprotobuf_found="yes"], [libprotobuf_found="no"])
+	if test "$libprotobuf_found" = "no" ; then
+		AC_MSG_ERROR([Google Protocol Buffers libraries not found])
+	fi
+	AC_CHECK_PROG(protoc_found, protoc, yes, no, $DIR_PROTOBUF_BIN_DEFAULT)
+	if test "$protoc_found" = "no" ; then
+		AC_MSG_ERROR([Google Protocol Buffers compiler not found on PATH])
+	fi
+	LIBS="$LIBS -lprotobuf -L$DIR_PROTOBUF_LIB_DEFAULT"
+	includes="$INCLUDES -I $DIR_PROTOBUF_INC_DEFAULT"
+	protoc="${DIR_PROTOBUF_BIN_DEFAULT}protoc"
+	
+	AC_CHECK_LIB([pcre], [main], [libpcre_found="yes"], [libpcre_found="no"])
+	if test "$libpcre_found" = "no" ; then
+		AC_MSG_ERROR([PCRE *Perl compatible regular expressions* libraries not found])
+	fi
+	LIBS="$LIBS -lpcre"
+	
+	AC_CHECK_LIB([floatfann], [main], [libfann_found="yes"], [libfann_found="no"])
+	if test "$libfann_found" = "no" ; then
+		AC_MSG_ERROR([FANN *Fast artificial neural network* libraries not found])
+	fi
+	LIBS="$LIBS -lfloatfann"
+	
+	AC_CHECK_LIB([tcl8.5], [main], [libtcl_found="yes"], [libtcl_found="no"])
+	if test "$libtcl_found" = "no" ; then
+		AC_MSG_ERROR([Tcl libraries not found])
+	fi
+	LIBS="$LIBS -ltcl8.5"
+else 
 	AC_MSG_RESULT([system-wide])
 	AC_CHECK_LIB([protobuf], [main], [libprotobuf_found="yes"], [libprotobuf_found="no"])
 	if test "$libprotobuf_found" = "no" ; then

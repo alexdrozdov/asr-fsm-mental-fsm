@@ -10,8 +10,11 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include <pcre.h>
+
+#include <string.h>
 
 #include "common.h"
 #include "interactive.h"
@@ -29,16 +32,6 @@ std::string build_data_list() {
 	return res + "}";
 }
 
-class check_entry_name {
-	string n;
-public:
-	check_entry_name(std::string name) {
-		n = name;
-	}
-	bool operator()(train_entry &ten) {
-		return ten.name == n;
-	}
-};
 
 bool remove_data_entry (std::string name) {
 	vector<train_entry>::iterator it = find_if(train_entries.begin(),train_entries.end(), check_entry_name(name));
@@ -65,10 +58,6 @@ bool reload_data_entry (std::string name) {
 	return true;
 }
 
-template<class T> void cout_numeric(T v) {
-	cout << " " << v;
-}
-
 bool show_data_entry (std::string name) {
 	vector<train_entry>::iterator it = find_if(train_entries.begin(),train_entries.end(), check_entry_name(name));
 	if (train_entries.end() == it) {
@@ -89,6 +78,10 @@ bool show_data_entry (std::string name) {
 			for_each(it->input.values.begin(),it->input.values.end(),cout_numeric<double>);
 			cout << endl;
 			break;
+		case iot_matrix:
+			cout << "\tmatrix:" << endl;
+			cout << "\trow count: " << it->input.fvalues.size() << endl;
+			break;
 	}
 
 	cout << "output:" << endl;
@@ -104,6 +97,10 @@ bool show_data_entry (std::string name) {
 			cout << "\tvalues: ";
 			for_each(it->output.values.begin(),it->output.values.end(),cout_numeric<double>);
 			cout << endl;
+			break;
+		case iot_matrix:
+			cout << "\tmatrix:" << endl;
+			cout << "\trow count: " << it->output.fvalues.size() << endl;
 			break;
 	}
 	return true;
@@ -126,6 +123,14 @@ void dump_train_io(train_io *tio) {
 			cout << "\tvalues: ";
 			for_each(tio->values.begin(),tio->values.end(),cout_numeric<double>);
 			cout << endl;
+			break;
+		case iot_matrix:
+			cout << "\tmatrix: " << endl;
+			for (vector<vector<double> >::iterator it = tio->fvalues.begin();it != tio->fvalues.end();it++) {
+				cout << "\t\t";
+				for_each(it->begin(),it->end(),cout_numeric<double>);
+				cout << endl;
+			}
 			break;
 	}
 }
@@ -272,7 +277,122 @@ bool load_output_entry_data(train_entry *ten) {
 	return true;
 }
 
-bool add_entry (int argc, const char *argv[]) {
+#define ST_NONE   0
+#define ST_INPUT  1
+#define ST_OUTPUT 2
+#define ST_NAME   3
+
+bool merge_entries(int argc, const char *argv[]) {
+	if (0 == argc) {
+		cout << "Usage: data merge -inp state [-inp state ]* -out state [-out state]* -name state_name" << endl;
+		return false;
+	}
+	//Определяем список состояний, которые надо объединить
+	vector<string> input_names;  //Названия состояний, для которых необходимо объединить входные обучающие выборки
+	vector<string> output_names; //Названия состояний, для которых необходимо объединить выходные обучающие выборки
+	string merged_name = "";
+	bool remove_merged = false;
+	int state = ST_NONE;
+	for (int i=0;i<argc;i++) {
+		switch(state) {
+			case ST_NONE:
+				if ("-inp" == (string)argv[i]) {
+					state = ST_INPUT;
+					continue;
+				}
+				if ("-out" == (string)argv[i]) {
+					state = ST_OUTPUT;
+					continue;
+				}
+				if ("-name" == (string)argv[i]) {
+					state = ST_NAME;
+					continue;
+				}
+				if ("-remove-merged" == (string)argv[i]) {
+					remove_merged = true;
+					continue;
+				}
+				cout << "merge_entries error - unknown option " << argv[i] << endl;
+				return false;
+				break;
+			case ST_INPUT:
+				input_names.push_back((string)argv[i]);
+				state = ST_NONE;
+				break;
+			case ST_OUTPUT:
+				output_names.push_back((string)argv[i]);
+				state = ST_NONE;
+				break;
+			case ST_NAME:
+				merged_name = (string)argv[i];
+				state = ST_NONE;
+				break;
+		}
+	}
+	if (ST_NONE != state) {
+		cout << "merge_entries error - missing option value" << endl;
+		return false;
+	}
+
+	train_entry ten;
+	ten.input.type = iot_matrix;
+	ten.input.fvalues.resize(0);
+	ten.output.type = iot_matrix;
+	ten.output.fvalues.resize(0);
+	for (vector<string>::iterator it=input_names.begin();it!=input_names.end();it++) {
+		vector<train_entry>::iterator ten_inp = find_if(train_entries.begin(),train_entries.end(), check_entry_name(*it));
+		if (train_entries.end() == ten_inp) {
+			cout << "merge_entries error - unknown state " << *it << endl;
+			return false;
+		}
+		switch (ten_inp->input.type) {
+			case iot_vect:
+				ten.input.fvalues.push_back(ten_inp->input.values);
+				break;
+			case iot_file:
+			case iot_matrix:
+				for (vector< vector<double> >::iterator fval_it=ten_inp->input.fvalues.begin();fval_it!=ten_inp->input.fvalues.end();fval_it++) {
+					ten.input.fvalues.push_back(*fval_it);
+				}
+				break;
+		}
+	}
+
+	for (vector<string>::iterator it=output_names.begin();it!=output_names.end();it++) {
+		vector<train_entry>::iterator ten_out = find_if(train_entries.begin(),train_entries.end(), check_entry_name(*it));
+		if (train_entries.end() == ten_out) {
+			cout << "merge_entries error - unknown state " << *it << endl;
+			return false;
+		}
+		switch (ten_out->output.type) {
+			case iot_vect:
+				ten.output.fvalues.push_back(ten_out->output.values);
+				break;
+			case iot_file:
+			case iot_matrix:
+				for (vector< vector<double> >::iterator fval_it=ten_out->output.fvalues.begin();fval_it!=ten_out->output.fvalues.end();fval_it++) {
+					ten.output.fvalues.push_back(*fval_it);
+				}
+				break;
+		}
+	}
+
+	if (remove_merged) {
+		for (vector<string>::iterator it=input_names.begin();it!=input_names.end();it++) {
+			remove_data_entry(*it);
+		}
+		for (vector<string>::iterator it=output_names.begin();it!=output_names.end();it++) {
+			remove_data_entry(*it);
+		}
+	}
+	remove_data_entry(merged_name);
+	ten.name = merged_name;
+
+	train_entries.push_back(ten);
+	return true;
+}
+
+bool add_entry(int argc, const char *argv[]) {
 	if (0==fann_opts.inputs || 0==fann_opts.outputs) {
 		cout << "add_entry error - не задано количество входов и/или выходов нейронной сети" << endl;
 		return false;
@@ -423,6 +543,11 @@ int data_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 		}
 	}
 
+	//"merge -inp st1 -inp st2 -inp st3 -out st1 -name st1"
+	if (argc>=2 && "merge" == (string)argv[1] && merge_entries(argc-2, argv+2)) {
+		return TCL_OK;
+	}
+
 	if (argc>=2 && "add" == (string)argv[1] && add_entry(argc-2, argv+2)) { // Добавить запись
 		//Только опция add может иметь переменное количество параметров. Во всех остальных случаях считаем вызов ошибкой
 		return TCL_OK;
@@ -434,7 +559,8 @@ int data_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 			"reload - перезагрузить набор данных, связанный с внешним файлом\n"
 			"show   - отобразить основную информацию об указанном наборе данных\n"
 			"dump   - вывести содержимое указанного набора данных\n"
-			"add    - создать новый набор данных\n",
+			"add    - создать новый набор данных\n"
+			"merge  - объединить наборы данных\n",
 			TCL_STATIC);
 	return TCL_ERROR;
 }
