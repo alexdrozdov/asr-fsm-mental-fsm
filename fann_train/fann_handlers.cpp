@@ -141,6 +141,7 @@ bool validate_fann_opts() {
 				}
 				break;
 			case iot_file:
+			case iot_matrix:
 				if (fann_opts.inputs != (int)ten.input.entry_size()) {
 					cout << "validate_fann_opts error - количество входных данных для обучающей выборки " << ten.name << " не соответствует количеству входов нейронной сети" << endl;
 					return false;
@@ -164,6 +165,7 @@ bool validate_fann_opts() {
 				}
 				break;
 			case iot_file:
+			case iot_matrix:
 				if (fann_opts.outputs != (int)ten.output.entry_size()) {
 					cout << "validate_fann_opts error - количество входных данных для обучающей выборки " << ten.name << " не соответствует количеству выходов нейронной сети" << endl;
 					return false;
@@ -379,12 +381,12 @@ int fann_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 "hidden        - количество нейронов в скрытом слое\n"
 "desired-error - максимально допустимая ошибка\n"
 "max-epochs    - максимальное количество эпох обучения\n"
-"log-period    - периодичность вывода результатов тренировки"
+"log-period    - периодичность вывода результатов тренировки\n"
 "file          - файл с обученной нейронной сетью\n"
-"save          - сохранить результаты обучения в файл"
+"save          - сохранить результаты обучения в файл\n"
 "trained       - признак того, что нейронная сеть обучена по последним данным\n"
-"train         - обучить неронную сеть"
-"validate data - проверить нейронную сеть по данным"
+"train         - обучить неронную сеть\n"
+"validate data - проверить нейронную сеть по данным\n"
 			, TCL_STATIC);
 	return TCL_ERROR;
 }
