@@ -85,7 +85,7 @@ fann_type* train_io::to_mem(int nrow) {
 		case iot_file:
 		case iot_matrix:
 			v = new fann_type[fvalues[0].size()];
-			std::vector<double>& val_row = fvalues[nrow];
+			std::vector<double>& val_row = fvalues[nrow<(int)fvalues.size()?nrow:fvalues.size()-1];
 			for (int i=0;i<(int)val_row.size();i++)
 				v[i] = (fann_type)val_row[i];
 			break;
@@ -224,6 +224,7 @@ void test_train_data(std::string train_name) {
 	fann_type *res = NULL;
 	switch(it->input.type) {
 		case iot_file:
+		case iot_matrix:
 			for (vector<vector<double> >::iterator sample_it = it->input.fvalues.begin();sample_it != it->input.fvalues.end();sample_it++) {
 				for (int i=0;i<(int)sample_it->size();i++) {
 					fann_input[i] = sample_it->operator [](i);

@@ -23,13 +23,7 @@ using namespace fann_train_cfg;
 
 project_info project;
 
-void save_project() {
-	if (!project.file_name_present) {
-		return;
-	}
-
-	fann_train_cfg::FannTrainProject ftp;
-
+void serialize_project(fann_train_cfg::FannTrainProject &ftp) {
 	ftp.set_name(project.name);
 	ftp.set_file_name(project.file_name);
 	ftp.set_description("");
@@ -132,10 +126,36 @@ void save_project() {
 				break;
 		}
 	}
+}
 
+bool load_project_file(std::string file_name, fann_train_cfg::FannTrainProject& ftp) {
+	fstream input(file_name.c_str(), ios::in | ios::binary);
+	if (!input) {
+	  cout << "load_project error - файл " << file_name << " не найден" << endl;
+	  return false;
+	} else if (!ftp.ParseFromIstream(&input)) {
+	  cerr << "Не удалось загрузить проект" << endl;
+	  input.close();
+	  return false;
+	}
+	input.close();
+	return true;
+}
 
+void save_project() {
+	if (!project.file_name_present) {
+		return;
+	}
+	string file_name = build_project_path(project.file_name);
+	fann_train_cfg::FannTrainProject ftp;
+	serialize_project(ftp);
 
-	fstream output(build_project_path(project.file_name).c_str(), ios::out | ios::trunc | ios::binary);
+	fann_train_cfg::FannTrainProject ftp_old;
+	if (load_project_file(file_name, ftp_old) && ftp_old.has_history()) {
+		ftp.mutable_history()->CopyFrom(ftp_old.history());
+	}
+
+	fstream output(file_name.c_str(), ios::out | ios::trunc | ios::binary);
 	if (!ftp.SerializeToOstream(&output)) {
 	  cerr << "Не удалось сохранить проект в файл " << project.file_name << endl;
 	  return;
@@ -151,25 +171,12 @@ void saveas_project(std::string file_name) {
 	}
 }
 
-bool load_project(std::string file_name) {
-	file_name = build_project_path(file_name); //Определяем полный путь к файлу проекта
-	size_t last_slash = file_name.rfind('/');
-	project_path = file_name.substr(0,last_slash+1); //Переносим рабочий каталог в папку с проектом
-
-	fann_train_cfg::FannTrainProject ftp;
-	fstream input(file_name.c_str(), ios::in | ios::binary);
-	if (!input) {
-	  cout << "load_project error - файл " << file_name << " не найден" << endl;
-	  return false;
-	} else if (!ftp.ParseFromIstream(&input)) {
-	  cerr << "Не удалось загрузить проект" << endl;
-	  return false;
-	}
-
+void unpack_project(fann_train_cfg::FannTrainProject& ftp) {
 	project.name = ftp.name();
-	project.file_name = file_name;
 	project.loaded = true;
 	project.saved  = true;
+
+	train_entries.clear();
 
 	fann_opts.inputs = ftp.fann_opts().num_input();
 	fann_opts.outputs = ftp.fann_opts().num_output();
@@ -258,7 +265,163 @@ bool load_project(std::string file_name) {
 	}
 
 	project.file_name_present = true;
+}
+
+bool load_project(std::string file_name) {
+	file_name = build_project_path(file_name); //Определяем полный путь к файлу проекта
+	fann_train_cfg::FannTrainProject ftp;
+	if (!load_project_file(file_name, ftp)) return false;
+
+	size_t last_slash = file_name.rfind('/');
+	project_path = file_name.substr(0,last_slash+1); //Переносим рабочий каталог в папку с проектом
+	project.file_name = file_name;
+
+	unpack_project(ftp);
 	return true;
+}
+
+bool project_help() {
+	cout << "project: avaible subcommands:" << endl;
+	cout << "\tname ?name - get or set project name?" << endl;
+	cout << "\tfile - get current project file name" << endl;
+	cout << "\tsave - save existing project with its current file name" << endl;
+	cout << "\tpath - ?path? - get or set path, where to search referenced files" << endl;
+	cout << "\tload file - load project file without updating references files" << endl;
+	cout << "\tcommit ?name? ?comment? - save current project state with name" << endl;
+	cout << "\trevert name   - restore project state with specified name" << endl;
+	cout << "\tforget name   - forget branch starting from specified project state" << endl;
+	cout << "\thistory - show history tree" << endl;
+	return true;
+}
+
+FannTrainProject_ProjectHistory_HistoryEntry* project_find_commit(FannTrainProject_ProjectHistory *ph, string commit_name) {
+	if (NULL == ph) return NULL;
+	for (int i=0;i<ph->entries_size();i++) {
+		FannTrainProject_ProjectHistory_HistoryEntry* mhe = ph->mutable_entries(i);
+		if (mhe->id() == commit_name) {
+			return mhe;
+		}
+	}
+	return NULL;
+}
+
+bool project_commit(vector<string>& args) {
+	if (!project.file_name_present) {
+		cout << "project_commit error - project wasnt saved yet" << endl;
+		return false;
+	}
+
+	//Загружаем текущий проект из его файла (только в виде структуры google protocol buffers)
+	string file_name = build_project_path(project.file_name); //Определяем полный путь к файлу проекта
+	fann_train_cfg::FannTrainProject ftp;
+	fstream input(file_name.c_str(), ios::in | ios::binary);
+	if (!input) {
+	  cout << "project_commit error - файл " << file_name << " не найден" << endl;
+	  return false;
+	} else if (!ftp.ParseFromIstream(&input)) {
+	  cerr << "Не удалось загрузить проект" << endl;
+	  return false;
+	}
+	input.close();
+
+	bool history_present = false;
+	string commit_name = "auto";
+	string commit_comment = "automatic commit";
+	if (ftp.has_history()) {
+		history_present = true;
+	} else {
+	}
+
+	FannTrainProject_ProjectHistory* ph = ftp.mutable_history();
+	//Определяем название коммита и его комментарий
+	if (args.size()>= 3) {
+		string user_commit_name = args[2];
+		if (NULL == project_find_commit(ph,user_commit_name)) {
+			commit_name = user_commit_name;
+		} else {
+			cout << "project commit error - commit \"" << user_commit_name << "\" already exists" << endl;
+			return false;
+		}
+		if (args.size() >= 4) {
+			commit_comment = args[3];
+		}
+	} else { //Истории нет, имя комита не задано, генерируем его автоматически
+		stringstream ostr;
+		ostr << "auto:" << ph->entries_size();
+		ostr >> commit_name;
+		commit_comment = "automatic commit, comment not specified";
+	}
+
+	//Создаем новую запись в истории и копируем в нее последнее состояние проекта
+	FannTrainProject_ProjectHistory_HistoryEntry *he = ph->add_entries();
+	he->mutable_fann_opts()->CopyFrom(ftp.fann_opts());
+	he->mutable_entries()->CopyFrom(ftp.entries());
+	he->set_id(commit_name);
+	he->set_commit_message(commit_comment);
+
+	if (!history_present) { //Проект еще не имел истории, делаем текущий комит первым и единственным
+		ph->set_current_id(commit_name);
+	} else {
+		he->set_parent_id(ph->current_id()); //Предыдущий коммит становится родителем этого коммита
+		FannTrainProject_ProjectHistory_HistoryEntry * he_prev = project_find_commit(ph, ph->current_id());
+		if (NULL != he_prev) {
+			he_prev->add_child_id(commit_name); //Добавляем к текущему активному коммиту ссылку на новый дочерний коммит
+		}
+		ph->set_current_id(commit_name); //И делаем вновь созданный коммит текущим
+	}
+
+	fstream output(file_name.c_str(), ios::out | ios::trunc | ios::binary);
+	if (!ftp.SerializeToOstream(&output)) {
+	  cerr << "Не удалось сохранить проект в файл " << project.file_name << endl;
+	  return false;
+	}
+	return true;
+}
+
+void project_history(vector<string>& args) {
+	if (!project.file_name_present) {
+		return;
+	}
+	string file_name = build_project_path(project.file_name);
+	fann_train_cfg::FannTrainProject ftp;
+	if (!load_project_file(file_name, ftp) || !ftp.has_history()) {
+		cout << "project doesn`t contain history" << endl;
+		return;
+	}
+	for (int i=0;i<ftp.history().entries_size();i++) {
+		const FannTrainProject_ProjectHistory_HistoryEntry& he = ftp.history().entries(i);
+		cout << he.id() << ": " << he.commit_message() << endl;
+	}
+}
+
+void project_revert(vector<string>& args) {
+	if (!project.file_name_present) {
+		return;
+	}
+	string file_name = build_project_path(project.file_name);
+	fann_train_cfg::FannTrainProject ftp;
+	if (!load_project_file(file_name, ftp) || !ftp.has_history()) {
+		cout << "project_revert error - project doesn`t contain history" << endl;
+		return;
+	}
+
+	string commit_name = args[2];
+	FannTrainProject_ProjectHistory_HistoryEntry* he = project_find_commit(ftp.mutable_history(), commit_name);
+	if (NULL == he) {
+		cout << "project_revert error - commit \"" << commit_name << "\" not found" << endl;
+		return;
+	}
+	ftp.mutable_fann_opts()->CopyFrom(he->fann_opts());
+	ftp.mutable_entries()->CopyFrom(he->entries());
+	ftp.mutable_history()->set_current_id(he->id());
+
+	fstream output(file_name.c_str(), ios::out | ios::trunc | ios::binary);
+	if (!ftp.SerializeToOstream(&output)) {
+	  cerr << "Не удалось сохранить проект в файл " << project.file_name << endl;
+	  return;
+	}
+
+	unpack_project(ftp);
 }
 
 int project_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
@@ -289,6 +452,10 @@ int project_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST c
 			Tcl_SetResult(interp, (char*)project_path.c_str(), TCL_VOLATILE);
 			return TCL_OK;
 		}
+		if ("help" == args[1]) {
+			project_help();
+			return TCL_OK;
+		}
 	}
 
 	if (3 == argc) {
@@ -309,7 +476,23 @@ int project_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST c
 			project_path = build_file_path(args[2]);
 			return TCL_OK;
 		}
+		if ("revert" == args[1]) {
+			project_revert(args);
+			return TCL_OK;
+		}
 	}
+
+	if (2 <= argc) {
+		if ("commit" == args[1]) {
+			project_commit(args);
+			return TCL_OK;
+		}
+		if ("history" == args[1]) {
+			project_history(args);
+			return TCL_OK;
+		}
+	}
+
 	Tcl_SetResult(interp, (char*)"wrong options. Usage project file|save|(saveas filename)|(load filename)", TCL_STATIC);
 	return TCL_ERROR;
 }
