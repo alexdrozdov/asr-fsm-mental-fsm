@@ -9,10 +9,6 @@
 
 #include <unistd.h>
 #include <sys/time.h>
-#include <openssl/md5.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/buffer.h>
 
 #include <sys/poll.h>
 #include <pthread.h>
@@ -29,6 +25,7 @@
 #include "p2hub.h"
 #include "p2message.h"
 #include "cfg_reader.h"
+#include "base64.h"
 
 using namespace std;
 
@@ -257,6 +254,26 @@ void P2Vera::create_netfind() {
 	//nf->add_broadcast_servers("7300");
 }
 
+unsigned int crc32(const unsigned char *buf, size_t len) {
+    unsigned int crc_table[256];
+    unsigned int crc;
+
+    for (int i = 0; i < 256; i++) {
+        crc = i;
+        for (int j = 0; j < 8; j++) {
+            crc = crc & 1 ? (crc >> 1) ^ 0xEDB88320UL : crc >> 1;
+        }
+        crc_table[i] = crc;
+    }
+
+    crc = 0xFFFFFFFFUL;
+    while (len--) {
+        crc = crc_table[(crc ^ *buf++) & 0xFF] ^ (crc >> 8);
+    }
+
+    return crc ^ 0xFFFFFFFFUL;
+}
+
 void P2Vera::generate_uniq_id() {
 	app_uniq_info aui;
 	gettimeofday(&aui.tv_now, NULL);
@@ -265,24 +282,8 @@ void P2Vera::generate_uniq_id() {
 	aui.host_id = gethostid();
 	gethostname(aui.hostname, MAX_HOSTNAME_LEN);
 
-	MD5((const unsigned char*)(&aui), sizeof(app_uniq_info), (unsigned char*)md5_data);
-
-	//Перекодируем в Base-64
-	BIO *bmem, *b64;
-	BUF_MEM *bptr;
-
-	b64 = BIO_new(BIO_f_base64());
-	bmem = BIO_new(BIO_s_mem());
-	b64 = BIO_push(b64, bmem);
-	BIO_write(b64, md5_data, MD5_DIGEST_LENGTH);
-	BIO_flush(b64);
-	BIO_get_mem_ptr(b64, &bptr);
-	char *buff = new char[bptr->length+1];
-	memcpy(buff, bptr->data, bptr->length-1);
-	buff[bptr->length-1] = 0;
-	uniq_id = buff;
-	delete[] buff;
-	BIO_free_all(b64);
+	unsigned int crc32_hash = crc32((const unsigned char*)(&aui), sizeof(app_uniq_info));
+	uniq_id = base64_encode((unsigned char const*)&crc32_hash, sizeof(unsigned int));
 }
 
 std::string P2Vera::get_uniq_id() {

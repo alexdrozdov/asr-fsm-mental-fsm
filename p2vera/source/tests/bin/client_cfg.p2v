@@ -1,0 +1,51 @@
+# P2Vera config
+
+#Настройки локального сервера
+[local_server]
+name = "asr-dsp-client"
+caption = "ASR DSP engine"
+cluster = "asr-fsm-cluster"
+address = "127.0.0.1"
+hash = ""
+server_port = 7300
+min_client_port = 7301
+max_client_port = 7400
+disable_udp = false
+disable_tcp = false
+start_network = false
+
+#Настройки обнаружения сервером других серверов и видимости сервера для других серверов
+[discover]
+remote_server = "127.0.0.1"
+	port = 7300
+	required = true
+	interface = "lo"
+
+
+#Список потоков, которые видит сервер по-умолчанию
+[streams]
+allow_append = true
+stream = "c2s-proc-data"
+	direction = "output"
+	integrity = "chrono"
+	interface = "lo"
+	protocol = "stream"
+	
+stream = "error"
+	direction = "bidir"
+	integrity = "any"
+	interface = "lo"
+	protocol  = "dgram"
+	
+stream = "control"
+	direction = "bidir"
+	integrity = "chrono"
+	interface = "lo"
+	protocol  = "stream"
+	
+stream = "s2c-response"
+	direction = "input"
+	integrity = "chrono"
+	interface = "lo"
+	protocol  = "stream"
+

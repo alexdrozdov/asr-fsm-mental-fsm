@@ -167,7 +167,7 @@ int Tcl_AppInit (Tcl_Interp *interp) {
     create_procs(interp);
 
     if (run_options.load_project)
-    	load_project(build_file_path(run_options.project_file));
+    	load_project(run_options.project_file);
 
     return TCL_OK;
 }

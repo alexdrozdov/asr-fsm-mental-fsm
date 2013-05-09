@@ -6,6 +6,8 @@ trg_netfind=_tst_net_find.bin
 trg_hub=_tst_hub.bin
 trg_p2vera=_tst_p2vera.bin
 trg_rcv_p2vera=_tst_rcv_p2vera.bin
+trg_msgclient=_test_msgclient.bin
+trg_msgserver=_test_msgserver.bin
 BUILD_DIR=@build_dir@
 
 CFLAGS=@CFLAGS@ @includes@ -c 
@@ -14,7 +16,7 @@ LDFLAGS=-rdynamic @LIBS@
 SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-all:$(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) $(BUILD_DIR)/$(trg_p2vera) $(BUILD_DIR)/$(trg_rcv_p2vera) @install_targets@
+all:$(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) $(BUILD_DIR)/$(trg_p2vera) $(BUILD_DIR)/$(trg_rcv_p2vera) $(BUILD_DIR)/$(trg_msgclient) @install_targets@
 
 $(BUILD_DIR)/$(trg_netfind): dirs $(OBJS)
 	@echo [LD] $(trg_netfind); \
@@ -31,6 +33,10 @@ $(BUILD_DIR)/$(trg_p2vera): dirs $(OBJS)
 $(BUILD_DIR)/$(trg_rcv_p2vera): dirs $(OBJS)
 	@echo [LD] $(trg_rcv_p2vera); \
 	$(CCP) $(BUILD_DIR)/common.o $(BUILD_DIR)/test_rcv.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_rcv_p2vera)
+	
+$(BUILD_DIR)/$(trg_msgclient): dirs $(OBJS)
+	@echo [LD] $(trg_msgclient); \
+	$(CCP) $(BUILD_DIR)/test_msgclient.o $(BUILD_DIR)/p2vera_link.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_msgclient)
 
 install.gnulinux: FORCE
 	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
@@ -52,6 +58,9 @@ install.macos: FORCE
 	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_rcv_p2vera)
 	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_rcv_p2vera)
 	@cp $(BUILD_DIR)/$(trg_rcv_p2vera) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_msgclient)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_msgclient)
+	@cp $(BUILD_DIR)/$(trg_msgclient) ../../bin/
 	@echo Done
 
 dirs: FORCE
