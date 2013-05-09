@@ -21,8 +21,6 @@ AC_HEADER_STDBOOL
 AC_CHECK_FUNCS([gethostname gettimeofday inet_ntoa memset socket])
 
 # Checks for libraries.
-AC_CHECK_LIB([ssl], [main])
-AC_CHECK_LIB([crypto], [main])
 AC_CHECK_LIB([dl], [main])
 AC_CHECK_LIB([pthread], [main])
 
