@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
+
 #include <iostream>
 #include <string>
 
@@ -48,6 +50,8 @@ main(
 		cout << "main error: project path doesn`t exist or file operate.tcl is missing" << endl;
 		return 1;
 	}
+
+	signal(SIGPIPE, SIG_IGN);
 
 	Tcl_Main(1, argv, Tcl_AppInit);
 

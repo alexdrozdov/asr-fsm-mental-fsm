@@ -33,12 +33,21 @@ std::string build_data_list() {
 }
 
 
-bool remove_data_entry (std::string name) {
+bool remove_data_entry(std::string name) {
 	vector<train_entry>::iterator it = find_if(train_entries.begin(),train_entries.end(), check_entry_name(name));
 	if (train_entries.end() == it) {
 		return false;
 	}
 	train_entries.erase(it);
+	return true;
+}
+
+bool remove_data_entries(int argc, const char *argv[]) {
+	for (int i=0;i<argc;i++) {
+		if (!remove_data_entry(argv[i])) {
+			cout << "remove_data_entry error - entry \"" << argv[i] << "\" not found" << endl;
+		}
+	}
 	return true;
 }
 
@@ -506,15 +515,6 @@ int data_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 		string aux_cmd = argv[1];
 		string aux_opt = argv[2];
 
-		if ("remove" == aux_cmd) { // Удалить запись по ее названию
-			if (remove_data_entry(aux_opt)) {
-				return TCL_OK;
-			} else {
-				Tcl_SetResult(interp, (char*)"Запись с таким именем не найдена",TCL_STATIC);
-				return TCL_ERROR;
-			}
-		}
-
 		if ("reload" == aux_cmd) { // Перезагрузить запись, если она загружена из файла
 			if (reload_data_entry(aux_opt)) {
 				return TCL_OK;
@@ -541,6 +541,10 @@ int data_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char
 				return TCL_ERROR;
 			}
 		}
+	}
+
+	if (argc>=3 && "remove" == (string)argv[1] && remove_data_entries(argc-2, argv+2)) {
+		return TCL_OK;
 	}
 
 	//"merge -inp st1 -inp st2 -inp st3 -out st1 -name st1"

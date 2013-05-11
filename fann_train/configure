@@ -602,6 +602,7 @@ protoc
 install_targets
 libext
 protoc_found
+TCL_THREADS
 EGREP
 GREP
 CPP
@@ -656,6 +657,8 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_threads
+enable_shared
 with_aux_protobuf
 '
       ac_precious_vars='build_alias
@@ -1277,6 +1280,13 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-option-checking  ignore unrecognized --enable/--with options
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-threads        build with threads (default: off)
+  --enable-shared         build and link with shared libraries (default: on)
+
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
@@ -1449,6 +1459,119 @@ fi
   as_fn_set_status $ac_retval
 
 } # ac_fn_c_try_compile
+
+# ac_fn_c_try_link LINENO
+# -----------------------
+# Try to link conftest.$ac_ext, and return whether this succeeded.
+ac_fn_c_try_link ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  rm -f conftest.$ac_objext conftest$ac_exeext
+  if { { ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
+$as_echo "$ac_try_echo"; } >&5
+  (eval "$ac_link") 2>conftest.err
+  ac_status=$?
+  if test -s conftest.err; then
+    grep -v '^ *+' conftest.err >conftest.er1
+    cat conftest.er1 >&5
+    mv -f conftest.er1 conftest.err
+  fi
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 $as_test_x conftest$ac_exeext
+       }; then :
+  ac_retval=0
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_retval=1
+fi
+  # Delete the IPA/IPO (Inter Procedural Analysis/Optimization) information
+  # created by the PGI compiler (conftest_ipa8_conftest.oo), as it would
+  # interfere with the next link command; also delete a directory that is
+  # left behind by Apple's compiler.  We do this before executing the actions.
+  rm -rf conftest.dSYM conftest_ipa8_conftest.oo
+  eval $as_lineno_stack; test "x$as_lineno_stack" = x && { as_lineno=; unset as_lineno;}
+  as_fn_set_status $ac_retval
+
+} # ac_fn_c_try_link
+
+# ac_fn_c_check_func LINENO FUNC VAR
+# ----------------------------------
+# Tests whether FUNC exists, setting the cache variable VAR accordingly
+ac_fn_c_check_func ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
+$as_echo_n "checking for $2... " >&6; }
+if eval "test \"\${$3+set}\"" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+/* Define $2 to an innocuous variant, in case <limits.h> declares $2.
+   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
+#define $2 innocuous_$2
+
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $2 (); below.
+    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
+    <limits.h> exists even on freestanding compilers.  */
+
+#ifdef __STDC__
+# include <limits.h>
+#else
+# include <assert.h>
+#endif
+
+#undef $2
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char $2 ();
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined __stub_$2 || defined __stub___$2
+choke me
+#endif
+
+int
+main ()
+{
+return $2 ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  eval "$3=yes"
+else
+  eval "$3=no"
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+eval ac_res=\$$3
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+  eval $as_lineno_stack; test "x$as_lineno_stack" = x && { as_lineno=; unset as_lineno;}
+
+} # ac_fn_c_check_func
 
 # ac_fn_c_try_cpp LINENO
 # ----------------------
@@ -1704,119 +1827,6 @@ $as_echo "$ac_res" >&6; }
   eval $as_lineno_stack; test "x$as_lineno_stack" = x && { as_lineno=; unset as_lineno;}
 
 } # ac_fn_c_check_type
-
-# ac_fn_c_try_link LINENO
-# -----------------------
-# Try to link conftest.$ac_ext, and return whether this succeeded.
-ac_fn_c_try_link ()
-{
-  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
-  rm -f conftest.$ac_objext conftest$ac_exeext
-  if { { ac_try="$ac_link"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
-$as_echo "$ac_try_echo"; } >&5
-  (eval "$ac_link") 2>conftest.err
-  ac_status=$?
-  if test -s conftest.err; then
-    grep -v '^ *+' conftest.err >conftest.er1
-    cat conftest.er1 >&5
-    mv -f conftest.er1 conftest.err
-  fi
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest$ac_exeext && {
-	 test "$cross_compiling" = yes ||
-	 $as_test_x conftest$ac_exeext
-       }; then :
-  ac_retval=0
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	ac_retval=1
-fi
-  # Delete the IPA/IPO (Inter Procedural Analysis/Optimization) information
-  # created by the PGI compiler (conftest_ipa8_conftest.oo), as it would
-  # interfere with the next link command; also delete a directory that is
-  # left behind by Apple's compiler.  We do this before executing the actions.
-  rm -rf conftest.dSYM conftest_ipa8_conftest.oo
-  eval $as_lineno_stack; test "x$as_lineno_stack" = x && { as_lineno=; unset as_lineno;}
-  as_fn_set_status $ac_retval
-
-} # ac_fn_c_try_link
-
-# ac_fn_c_check_func LINENO FUNC VAR
-# ----------------------------------
-# Tests whether FUNC exists, setting the cache variable VAR accordingly
-ac_fn_c_check_func ()
-{
-  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
-$as_echo_n "checking for $2... " >&6; }
-if eval "test \"\${$3+set}\"" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-/* Define $2 to an innocuous variant, in case <limits.h> declares $2.
-   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
-#define $2 innocuous_$2
-
-/* System header to define __stub macros and hopefully few prototypes,
-    which can conflict with char $2 (); below.
-    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
-    <limits.h> exists even on freestanding compilers.  */
-
-#ifdef __STDC__
-# include <limits.h>
-#else
-# include <assert.h>
-#endif
-
-#undef $2
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char $2 ();
-/* The GNU C library defines this for functions which it implements
-    to always fail with ENOSYS.  Some functions are actually named
-    something starting with __ and the normal name is an alias.  */
-#if defined __stub_$2 || defined __stub___$2
-choke me
-#endif
-
-int
-main ()
-{
-return $2 ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  eval "$3=yes"
-else
-  eval "$3=no"
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-fi
-eval ac_res=\$$3
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-  eval $as_lineno_stack; test "x$as_lineno_stack" = x && { as_lineno=; unset as_lineno;}
-
-} # ac_fn_c_check_func
 cat >config.log <<_ACEOF
 This file contains any messages produced by compilers while
 running configure, to aid debugging if configure makes a mistake.
@@ -3219,10 +3229,6 @@ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
-SC_ENABLE_THREADS
-SC_ENABLE_SHARED
-
-# Checks for header files.
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -3492,6 +3498,443 @@ $as_echo "$ac_cv_path_EGREP" >&6; }
  EGREP="$ac_cv_path_EGREP"
 
 
+
+    # Check whether --enable-threads was given.
+if test "${enable_threads+set}" = set; then :
+  enableval=$enable_threads; tcl_ok=$enableval
+else
+  tcl_ok=no
+fi
+
+
+    if test "${TCL_THREADS}" = 1; then
+	tcl_threaded_core=1;
+    fi
+
+    if test "$tcl_ok" = "yes" -o "${TCL_THREADS}" = 1; then
+	TCL_THREADS=1
+	# USE_THREAD_ALLOC tells us to try the special thread-based
+	# allocator that significantly reduces lock contention
+
+$as_echo "#define USE_THREAD_ALLOC 1" >>confdefs.h
+
+
+$as_echo "#define _REENTRANT 1" >>confdefs.h
+
+	if test "`uname -s`" = "SunOS" ; then
+
+$as_echo "#define _POSIX_PTHREAD_SEMANTICS 1" >>confdefs.h
+
+	fi
+
+$as_echo "#define _THREAD_SAFE 1" >>confdefs.h
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_mutex_init in -lpthread" >&5
+$as_echo_n "checking for pthread_mutex_init in -lpthread... " >&6; }
+if test "${ac_cv_lib_pthread_pthread_mutex_init+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpthread  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pthread_mutex_init ();
+int
+main ()
+{
+return pthread_mutex_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_pthread_pthread_mutex_init=yes
+else
+  ac_cv_lib_pthread_pthread_mutex_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pthread_pthread_mutex_init" >&5
+$as_echo "$ac_cv_lib_pthread_pthread_mutex_init" >&6; }
+if test "x$ac_cv_lib_pthread_pthread_mutex_init" = x""yes; then :
+  tcl_ok=yes
+else
+  tcl_ok=no
+fi
+
+	if test "$tcl_ok" = "no"; then
+	    # Check a little harder for __pthread_mutex_init in the same
+	    # library, as some systems hide it there until pthread.h is
+	    # defined.  We could alternatively do an AC_TRY_COMPILE with
+	    # pthread.h, but that will work with libpthread really doesn't
+	    # exist, like AIX 4.2.  [Bug: 4359]
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __pthread_mutex_init in -lpthread" >&5
+$as_echo_n "checking for __pthread_mutex_init in -lpthread... " >&6; }
+if test "${ac_cv_lib_pthread___pthread_mutex_init+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpthread  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char __pthread_mutex_init ();
+int
+main ()
+{
+return __pthread_mutex_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_pthread___pthread_mutex_init=yes
+else
+  ac_cv_lib_pthread___pthread_mutex_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pthread___pthread_mutex_init" >&5
+$as_echo "$ac_cv_lib_pthread___pthread_mutex_init" >&6; }
+if test "x$ac_cv_lib_pthread___pthread_mutex_init" = x""yes; then :
+  tcl_ok=yes
+else
+  tcl_ok=no
+fi
+
+	fi
+
+	if test "$tcl_ok" = "yes"; then
+	    # The space is needed
+	    THREADS_LIBS=" -lpthread"
+	else
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_mutex_init in -lpthreads" >&5
+$as_echo_n "checking for pthread_mutex_init in -lpthreads... " >&6; }
+if test "${ac_cv_lib_pthreads_pthread_mutex_init+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpthreads  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pthread_mutex_init ();
+int
+main ()
+{
+return pthread_mutex_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_pthreads_pthread_mutex_init=yes
+else
+  ac_cv_lib_pthreads_pthread_mutex_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pthreads_pthread_mutex_init" >&5
+$as_echo "$ac_cv_lib_pthreads_pthread_mutex_init" >&6; }
+if test "x$ac_cv_lib_pthreads_pthread_mutex_init" = x""yes; then :
+  tcl_ok=yes
+else
+  tcl_ok=no
+fi
+
+	    if test "$tcl_ok" = "yes"; then
+		# The space is needed
+		THREADS_LIBS=" -lpthreads"
+	    else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_mutex_init in -lc" >&5
+$as_echo_n "checking for pthread_mutex_init in -lc... " >&6; }
+if test "${ac_cv_lib_c_pthread_mutex_init+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lc  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pthread_mutex_init ();
+int
+main ()
+{
+return pthread_mutex_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_c_pthread_mutex_init=yes
+else
+  ac_cv_lib_c_pthread_mutex_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_pthread_mutex_init" >&5
+$as_echo "$ac_cv_lib_c_pthread_mutex_init" >&6; }
+if test "x$ac_cv_lib_c_pthread_mutex_init" = x""yes; then :
+  tcl_ok=yes
+else
+  tcl_ok=no
+fi
+
+		if test "$tcl_ok" = "no"; then
+		    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_mutex_init in -lc_r" >&5
+$as_echo_n "checking for pthread_mutex_init in -lc_r... " >&6; }
+if test "${ac_cv_lib_c_r_pthread_mutex_init+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lc_r  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pthread_mutex_init ();
+int
+main ()
+{
+return pthread_mutex_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_c_r_pthread_mutex_init=yes
+else
+  ac_cv_lib_c_r_pthread_mutex_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_r_pthread_mutex_init" >&5
+$as_echo "$ac_cv_lib_c_r_pthread_mutex_init" >&6; }
+if test "x$ac_cv_lib_c_r_pthread_mutex_init" = x""yes; then :
+  tcl_ok=yes
+else
+  tcl_ok=no
+fi
+
+		    if test "$tcl_ok" = "yes"; then
+			# The space is needed
+			THREADS_LIBS=" -pthread"
+		    else
+			TCL_THREADS=0
+			{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Don't know how to find pthread lib on your system - you must disable thread support or edit the LIBS in the Makefile..." >&5
+$as_echo "$as_me: WARNING: Don't know how to find pthread lib on your system - you must disable thread support or edit the LIBS in the Makefile..." >&2;}
+		    fi
+		fi
+	    fi
+	fi
+
+	# Does the pthread-implementation provide
+	# 'pthread_attr_setstacksize' ?
+
+	ac_saved_libs=$LIBS
+	LIBS="$LIBS $THREADS_LIBS"
+	for ac_func in pthread_attr_setstacksize
+do :
+  ac_fn_c_check_func "$LINENO" "pthread_attr_setstacksize" "ac_cv_func_pthread_attr_setstacksize"
+if test "x$ac_cv_func_pthread_attr_setstacksize" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PTHREAD_ATTR_SETSTACKSIZE 1
+_ACEOF
+
+fi
+done
+
+	ac_fn_c_check_func "$LINENO" "pthread_attr_get_np" "ac_cv_func_pthread_attr_get_np"
+if test "x$ac_cv_func_pthread_attr_get_np" = x""yes; then :
+  tcl_ok=yes
+else
+  tcl_ok=no
+fi
+
+	if test $tcl_ok = yes ; then
+
+$as_echo "#define HAVE_PTHREAD_ATTR_GET_NP 1" >>confdefs.h
+
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_attr_get_np declaration" >&5
+$as_echo_n "checking for pthread_attr_get_np declaration... " >&6; }
+if test "${tcl_cv_grep_pthread_attr_get_np+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+
+		cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <pthread.h>
+
+_ACEOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  $EGREP "pthread_attr_get_np" >/dev/null 2>&1; then :
+  tcl_cv_grep_pthread_attr_get_np=present
+else
+  tcl_cv_grep_pthread_attr_get_np=missing
+fi
+rm -f conftest*
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $tcl_cv_grep_pthread_attr_get_np" >&5
+$as_echo "$tcl_cv_grep_pthread_attr_get_np" >&6; }
+	    if test $tcl_cv_grep_pthread_attr_get_np = missing ; then
+
+$as_echo "#define ATTRGETNP_NOT_DECLARED 1" >>confdefs.h
+
+	    fi
+	else
+	    ac_fn_c_check_func "$LINENO" "pthread_getattr_np" "ac_cv_func_pthread_getattr_np"
+if test "x$ac_cv_func_pthread_getattr_np" = x""yes; then :
+  tcl_ok=yes
+else
+  tcl_ok=no
+fi
+
+	    if test $tcl_ok = yes ; then
+
+$as_echo "#define HAVE_PTHREAD_GETATTR_NP 1" >>confdefs.h
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_getattr_np declaration" >&5
+$as_echo_n "checking for pthread_getattr_np declaration... " >&6; }
+if test "${tcl_cv_grep_pthread_getattr_np+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+
+		    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <pthread.h>
+
+_ACEOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  $EGREP "pthread_getattr_np" >/dev/null 2>&1; then :
+  tcl_cv_grep_pthread_getattr_np=present
+else
+  tcl_cv_grep_pthread_getattr_np=missing
+fi
+rm -f conftest*
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $tcl_cv_grep_pthread_getattr_np" >&5
+$as_echo "$tcl_cv_grep_pthread_getattr_np" >&6; }
+		if test $tcl_cv_grep_pthread_getattr_np = missing ; then
+
+$as_echo "#define GETATTRNP_NOT_DECLARED 1" >>confdefs.h
+
+		fi
+	    fi
+	fi
+	if test $tcl_ok = no; then
+	    # Darwin thread stacksize API
+	    for ac_func in pthread_get_stacksize_np
+do :
+  ac_fn_c_check_func "$LINENO" "pthread_get_stacksize_np" "ac_cv_func_pthread_get_stacksize_np"
+if test "x$ac_cv_func_pthread_get_stacksize_np" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PTHREAD_GET_STACKSIZE_NP 1
+_ACEOF
+
+fi
+done
+
+	fi
+	LIBS=$ac_saved_libs
+    else
+	TCL_THREADS=0
+    fi
+    # Do checking message here to not mess up interleaved configure output
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for building with threads" >&5
+$as_echo_n "checking for building with threads... " >&6; }
+    if test "${TCL_THREADS}" = 1; then
+
+$as_echo "#define TCL_THREADS 1" >>confdefs.h
+
+	if test "${tcl_threaded_core}" = 1; then
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes (threaded core)" >&5
+$as_echo "yes (threaded core)" >&6; }
+	else
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	fi
+    else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no (default)" >&5
+$as_echo "no (default)" >&6; }
+    fi
+
+
+
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking how to build libraries" >&5
+$as_echo_n "checking how to build libraries... " >&6; }
+    # Check whether --enable-shared was given.
+if test "${enable_shared+set}" = set; then :
+  enableval=$enable_shared; tcl_ok=$enableval
+else
+  tcl_ok=yes
+fi
+
+
+    if test "${enable_shared+set}" = set; then
+	enableval="$enable_shared"
+	tcl_ok=$enableval
+    else
+	tcl_ok=yes
+    fi
+
+    if test "$tcl_ok" = "yes" ; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: shared" >&5
+$as_echo "shared" >&6; }
+	SHARED_BUILD=1
+    else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: static" >&5
+$as_echo "static" >&6; }
+	SHARED_BUILD=0
+
+$as_echo "#define STATIC_BUILD 1" >>confdefs.h
+
+    fi
+
+
+# Checks for header files.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ANSI C header files" >&5
 $as_echo_n "checking for ANSI C header files... " >&6; }
 if test "${ac_cv_header_stdc+set}" = set; then :

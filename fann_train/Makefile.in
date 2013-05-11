@@ -2,7 +2,7 @@ CCP=@CXX@
 CCC=@CC@
 PROTOC=@protoc@
 
-PROG=fann_train.bin
+PROG=_fann_train.bin
 BUILD_DIR=@build_dir@
 
 CFLAGS=@CFLAGS@ @includes@ -c 
@@ -23,6 +23,7 @@ $(BUILD_DIR)/$(PROG): dirs $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 
 install.gnulinux: FORCE
 	@cp $(BUILD_DIR)/$(PROG) ../../bin/
+	@cp ./bin/fann-train ../../bin/
 	@echo Done
 	
 install.macos: FORCE
@@ -30,6 +31,7 @@ install.macos: FORCE
 	@./inst_name_tool.sh $(BUILD_DIR)/$(PROG) libfloatfann.2.dylib libs/libfloatfann.2.dylib
 	@./inst_name_tool.sh $(BUILD_DIR)/$(PROG) libpcre.0.dylib      libs/libpcre.0.dylib
 	@cp $(BUILD_DIR)/$(PROG) ../../bin/
+	@cp ./bin/fann-train ../../bin/
 	@echo Done
 
 dirs: FORCE

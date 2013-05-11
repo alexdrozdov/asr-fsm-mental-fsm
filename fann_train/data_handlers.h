@@ -17,6 +17,7 @@
 
 std::string build_data_list();
 bool remove_data_entry (std::string name);
+bool remove_data_entries (int argc, const char *argv[]);
 bool reload_data_entry (std::string name);
 bool show_data_entry (std::string name);
 void dump_train_io(train_io *tio);
