@@ -12,3 +12,6 @@
 \.dylib$
 p2vera/bin/
 \.settings/
+p2vera/source/Makefile
+p2vera/source/config.h
+p2vera/source/tests/Makefile
