@@ -1,5 +1,6 @@
 CCP=@CXX@
 CCC=@CC@
+PROTOC=@protoc@
 
 
 trg_netfind=_tst_net_find.bin
@@ -16,7 +17,11 @@ LDFLAGS=-rdynamic @LIBS@
 SRCS=$(wildcard *.cpp)
 OBJS:=$(SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-all:$(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) $(BUILD_DIR)/$(trg_p2vera) $(BUILD_DIR)/$(trg_rcv_p2vera) $(BUILD_DIR)/$(trg_msgclient) @install_targets@
+PROTO=$(wildcard *.proto)
+PROTO_CC=$(PROTO:%.proto=%.pb.cc)
+PROTO_OBJ=$(PROTO_CC:%.cc=./obj/%.o)
+
+all: $(PROTO_CC) $(BUILD_DIR)/$(trg_netfind) $(BUILD_DIR)/$(trg_hub) $(BUILD_DIR)/$(trg_p2vera) $(BUILD_DIR)/$(trg_rcv_p2vera) $(BUILD_DIR)/$(trg_msgclient) $(BUILD_DIR)/$(trg_msgserver) @install_targets@
 
 $(BUILD_DIR)/$(trg_netfind): dirs $(OBJS)
 	@echo [LD] $(trg_netfind); \
@@ -34,15 +39,21 @@ $(BUILD_DIR)/$(trg_rcv_p2vera): dirs $(OBJS)
 	@echo [LD] $(trg_rcv_p2vera); \
 	$(CCP) $(BUILD_DIR)/common.o $(BUILD_DIR)/test_rcv.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_rcv_p2vera)
 	
-$(BUILD_DIR)/$(trg_msgclient): dirs $(OBJS)
+$(BUILD_DIR)/$(trg_msgclient): dirs $(PROTO_OBJ) $(OBJS)
 	@echo [LD] $(trg_msgclient); \
-	$(CCP) $(BUILD_DIR)/test_msgclient.o $(BUILD_DIR)/p2vera_link.o $(LDFLAGS) -o $(BUILD_DIR)/$(trg_msgclient)
+	$(CCP) $(BUILD_DIR)/test_msgclient.o $(BUILD_DIR)/p2vera_link.o $(PROTO_OBJ) $(LDFLAGS) -o $(BUILD_DIR)/$(trg_msgclient)
+	
+$(BUILD_DIR)/$(trg_msgserver): dirs $(PROTO_OBJ) $(OBJS)
+	@echo [LD] $(trg_msgserver); \
+	$(CCP) $(BUILD_DIR)/test_msgserver.o $(BUILD_DIR)/p2vera_link.o $(PROTO_OBJ) $(LDFLAGS) -o $(BUILD_DIR)/$(trg_msgserver)
 
 install.gnulinux: FORCE
 	@cp $(BUILD_DIR)/$(trg_netfind) ../../bin/
 	@cp $(BUILD_DIR)/$(trg_hub) ../../bin/
 	@cp $(BUILD_DIR)/$(trg_p2vera) ../../bin/
 	@cp $(BUILD_DIR)/$(trg_rcv_p2vera) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_msgclient) ../../bin/
+	@cp $(BUILD_DIR)/$(trg_msgserver) ../../bin/
 	@echo Done
 	
 install.macos: FORCE
@@ -61,6 +72,9 @@ install.macos: FORCE
 	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_msgclient)
 	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_msgclient)
 	@cp $(BUILD_DIR)/$(trg_msgclient) ../../bin/
+	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(trg_msgserver)
+	@install_name_tool -change ./obj/libp2vera.dylib @executable_path/libp2vera.dylib $(BUILD_DIR)/$(trg_msgserver)
+	@cp $(BUILD_DIR)/$(trg_msgserver) ../../bin/
 	@echo Done
 
 dirs: FORCE
@@ -70,12 +84,20 @@ dirs: FORCE
 $(BUILD_DIR)/%.o: %.cpp
 	@echo [CC] $< ; \
 	$(CCP) $(CFLAGS) $(CFLAGS_AUX) -MD -o $@ -c $< ;
+	
+$(BUILD_DIR)/%.o: %.cc
+	@echo [CC] $< ; \
+	$(CCP) $(CFLAGS) $(CFLAGS_AUX) -MD -o $@ -c $< ;	
+
+%.pb.cc: %.proto
+	@echo [PROTO] $< ; \
+	$(PROTOC) -I=./ --cpp_out=./ $< ;
 
 
 include $(wildcard $(BUILD_DIR)/*.d) 
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) *.pb.cc *.pb.h
 	
 	
 FORCE:

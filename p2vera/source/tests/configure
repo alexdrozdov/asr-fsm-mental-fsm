@@ -605,6 +605,7 @@ ac_includes_default="\
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 build_dir
+protoc
 includes
 install_targets
 TCL_THREADS
@@ -4296,6 +4297,7 @@ fi
 		as_fn_error $? "Google Protocol Buffers libraries not found" "$LINENO" 5
 	fi
 	LIBS="$LIBS -lprotobuf -L$DIR_PROTOBUF_LIB_DEFAULT"
+	protoc="${DIR_PROTOBUF_BIN_DEFAULT}protoc"
 	includes="$INCLUDES -I $DIR_PROTOBUF_INC_DEFAULT"
 else
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: system-wide" >&5
@@ -4340,12 +4342,14 @@ fi
 		as_fn_error $? "Google Protocol Buffers libraries not found" "$LINENO" 5
 	fi
 	LIBS="$LIBS -lprotobuf"
+	protoc="protoc"
 fi
 
 build_dir="./obj"
 CFLAGS="-Wall -O0 -g3"
 LIBS="$LIBS -L ../obj/ -l p2vera"
 includes="$INCLUDES -I ../"
+
 
 
 

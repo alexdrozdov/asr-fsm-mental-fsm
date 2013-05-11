@@ -1,0 +1,9 @@
+/autom4te.cache/
+.bin$
+.DS_Store$
+.cproject$
+.log$
+.status$
+.m4$
+.komodoproject$
+.in~$

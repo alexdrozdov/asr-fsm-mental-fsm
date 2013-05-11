@@ -1,0 +1,20 @@
+package msg_mtpx;
+
+
+message msg1 {
+	required string txt = 1;
+}
+
+message msg2 {
+	required string txt = 1;
+}
+
+message msg_multiplex_package {
+	repeated msg1 m1 = 1;
+	repeated msg2 m2 = 2;
+}
+
+
+
+
+

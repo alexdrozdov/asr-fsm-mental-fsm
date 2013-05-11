@@ -51,6 +51,7 @@ if test "$use_aux_protobuf" = "0" || test "$is_darwin" = "0" ; then
 		AC_MSG_ERROR([Google Protocol Buffers libraries not found])
 	fi
 	LIBS="$LIBS -lprotobuf -L$DIR_PROTOBUF_LIB_DEFAULT"
+	protoc="${DIR_PROTOBUF_BIN_DEFAULT}protoc"
 	includes="$INCLUDES -I $DIR_PROTOBUF_INC_DEFAULT"
 else
 	AC_MSG_RESULT([system-wide])
@@ -59,6 +60,7 @@ else
 		AC_MSG_ERROR([Google Protocol Buffers libraries not found])
 	fi
 	LIBS="$LIBS -lprotobuf"
+	protoc="protoc"
 fi
 
 build_dir="./obj"
@@ -68,6 +70,7 @@ includes="$INCLUDES -I ../"
 
 AC_SUBST(install_targets)
 AC_SUBST(includes)
+AC_SUBST(protoc)
 AC_SUBST(build_dir)
 
 AC_CONFIG_FILES([Makefile])

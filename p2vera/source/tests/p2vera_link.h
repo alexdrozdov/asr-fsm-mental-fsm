@@ -12,6 +12,9 @@
 #include <p2message.h>
 #include <p2stream.h>
 
+#include "msg_multiplex.pb.h"
+
+class AsrMsgCmn;
 
 class AsrMsg1 : public IP2VeraMessage {
 public:
@@ -27,8 +30,10 @@ public:
 	virtual bool set_data(std::string &str);
 
 	virtual void print();
+
+	friend class AsrMsgCmn;
 private:
-	std::string str;
+	msg_mtpx::msg_multiplex_package mmp;
 };
 
 class AsrMsg2 : public IP2VeraMessage {
@@ -45,39 +50,35 @@ public:
 	virtual bool set_data(std::string &str);
 
 	virtual void print();
+
+	friend class AsrMsgCmn;
 private:
-	std::string str;
+	msg_mtpx::msg_multiplex_package mmp;
 };
 
-class AsrP2vFlush : public IP2VeraMessage  {
+
+class AsrMsgCmn : public IP2VeraMessage {
 public:
-	AsrP2vFlush();
-	virtual ~AsrP2vFlush();
+	AsrMsgCmn();
+	AsrMsgCmn(std::string str);
+	AsrMsgCmn(const IP2VeraMessage& tm);
+	virtual ~AsrMsgCmn();
 
 	virtual bool get_data(std::string& str) const;
 	virtual int get_data(void* data, int max_data_size) const;
 	virtual int get_data_size() const;
 	virtual bool set_data(void* data, int data_size);
 	virtual bool set_data(std::string &str);
+
+	virtual AsrMsgCmn& operator>>(AsrMsg1& p2m);
+	virtual AsrMsgCmn& operator>>(AsrMsg2& p2m);
+	virtual bool has_m1();
+	virtual bool has_m2();
+
+	virtual void print();
+private:
+	msg_mtpx::msg_multiplex_package mmp;
 };
 
-class AsrP2Stream : public P2VeraStream {
-public:
-	AsrP2Stream();
-	AsrP2Stream(IP2VeraStreamQq* qq);
-	AsrP2Stream(const P2VeraStream& pvis);
-	virtual ~AsrP2Stream();
-	virtual AsrP2Stream& operator=(const AsrP2Stream& pvis);
-
-	virtual AsrP2Stream& operator<<(AsrMsg1& p2m);
-	virtual AsrP2Stream& operator>>(AsrMsg1& p2m);
-
-	virtual AsrP2Stream& operator<<(AsrMsg2& p2m);
-	virtual AsrP2Stream& operator>>(AsrMsg2& p2m);
-
-	virtual AsrP2Stream& operator<<(AsrP2vFlush& flush);
-};
-
-extern AsrP2vFlush asr_fl;
 
 #endif /* P2VERA_LINK_H_ */
