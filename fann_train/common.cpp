@@ -53,24 +53,17 @@ std::string build_file_path(string fpath) {
 	} else if ('/' == fpath[0]) {
 		return fpath;
 	}
-
 	string full_path = executable_path + fpath;
-
 	return full_path;
 }
 
 std::string build_project_path(string fpath) {
-	if ('.' == fpath[0]) {
-		fpath = fpath.substr(1);
-		if ('/' == fpath[0]) {
-			fpath = fpath.substr(1);
-		}
+	if (fpath.length()>2 && '.'==fpath[0] && '/'==fpath[1]) {
+		fpath = fpath.substr(2);
 	} else if ('/' == fpath[0]) {
 		return fpath;
 	}
-
 	string full_path = project_path + fpath;
-
 	return full_path;
 }
 

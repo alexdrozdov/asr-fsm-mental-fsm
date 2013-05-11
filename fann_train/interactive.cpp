@@ -188,7 +188,7 @@ int Tcl_AppInitScript (Tcl_Interp *interp) {
     }
 
     create_procs(interp);
-    string script_path = build_file_path(run_options.script_file_name);
+    string script_path = build_project_path(run_options.script_file_name);
     size_t last_slash = script_path.rfind('/');
     project_path = script_path.substr(0,last_slash+1);
 
