@@ -54,6 +54,7 @@ P2VeraStream& P2VeraStream::operator=(const P2VeraStream& pvis) {
 		return *this;
 	}
 
+	//FIXME При присвоении не удаляется ссылка на старый объект, в результате могут быть созданы повисшие очереди
 	//if (NULL!=qq && 0 == qq->decrease_ref_count()) { //Уменьшаем количество ссылок на текущий объект.
 	//	delete qq; //При необходимости удаляем его
 	//}
