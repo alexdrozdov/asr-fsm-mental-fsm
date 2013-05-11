@@ -1,6 +1,7 @@
 #!/bin/bash
 
-LD_LIBRARY_PATH=$(pwd)/libs/
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/libs/
 export LD_LIBRARY_PATH
+ROOT_PATH=$(cd $(dirname $0) && pwd);
 
-./_mental_fsm.bin $@
+$ROOT_PATH/_mental_fsm.bin $@
