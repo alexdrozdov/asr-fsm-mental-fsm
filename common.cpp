@@ -25,37 +25,36 @@ string project_path;
 map<char,option_handler_desc> option_handlers;
 
 std::string get_executable_path(char* argv0) {
-	string cwd = getcwd(NULL,0);
-	string argv_p = argv0 + 1;
-	string full_exe_path = cwd + argv_p;
+	string full_exe_path = "";
+	if ('/' != argv0[0]) {
+		string cwd = getcwd(NULL,0);
+		string argv_p = argv0 + 1;
+		full_exe_path = cwd + argv_p;
+	} else {
+		full_exe_path = argv0;
+	}
 	size_t last_slash = full_exe_path.rfind('/');
 
 	return full_exe_path.substr(0,last_slash+1);
 }
 
 std::string build_file_path(string fpath) {
-	if ('.' == fpath[0]) {
-		fpath = fpath.substr(1);
+	if (fpath.length()>2 && '.'==fpath[0] && '/'==fpath[1]) {
+		fpath = fpath.substr(2);
+	} else if ('/' == fpath[0]) {
+		return fpath;
 	}
-	if ('/' == fpath[0]) {
-		fpath = fpath.substr(1);
-	}
-
 	string full_path = executable_path + fpath;
-
 	return full_path;
 }
 
-std::string build_project_path(std::string fpath) {
-	if ('.' == fpath[0]) {
-		fpath = fpath.substr(1);
+std::string build_project_path(string fpath) {
+	if (fpath.length()>2 && '.'==fpath[0] && '/'==fpath[1]) {
+		fpath = fpath.substr(2);
+	} else if ('/' == fpath[0]) {
+		return fpath;
 	}
-	if ('/' == fpath[0]) {
-		fpath = fpath.substr(1);
-	}
-
 	string full_path = project_path + fpath;
-
 	return full_path;
 }
 

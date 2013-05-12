@@ -23,16 +23,20 @@ $(BUILD_DIR)/$(PROG): dirs $(PROTO_CC) $(PROTO_OBJ) $(OBJS)
 
 install.gnulinux: FORCE
 	@cp $(BUILD_DIR)/$(PROG) ../bin/
+	@cp $(BUILD_DIR)/$(PROG) ../../../bin/libs/
 	@echo Done
 	
 install.macos: FORCE
 	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libprotobuf.7.dylib $(BUILD_DIR)/$(PROG)
 	@cp $(BUILD_DIR)/$(PROG) ../bin/
+	@cp $(BUILD_DIR)/$(PROG) ../../../bin/libs/
 	@echo Done
 
 dirs: FORCE
 	-@if [ ! -d $(BUILD_DIR) ]; then mkdir $(BUILD_DIR); fi
 	-@if [ ! -d ../bin ]; then mkdir ../bin; fi
+	-@if [ ! -d ../../../bin ]; then mkdir ../../../bin; fi
+	-@if [ ! -d ../../../bin/libs ]; then mkdir ../../../bin/libs; fi
 
 $(BUILD_DIR)/%.o: %.cpp
 	@echo [CC] $< ; \
