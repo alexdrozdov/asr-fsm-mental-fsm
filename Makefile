@@ -7,6 +7,7 @@ ifeq ($(OS),Darwin)
           -I ./xml_support/ \
           -I ../../aux-packages/tcl8.5.9/generic/ \
           -I ../../aux-packages/build/include/ \
+          -I ../mental-fsm/p2vera/source/ \
           -DMACOSX -DAUXPACKAGES
     install_targets=install.macos
     PROTOC_PATH=$(shell pwd)/../../aux-packages/build/bin/
@@ -16,12 +17,14 @@ ifeq ($(OS),Darwin)
         -ldl \
         -L ./xml_support/obj/ -lxmlsup  \
         -L ../../aux-packages/build/lib/ -lprotobuf \
+        -L ../bin/libs/ -lp2vera \
         -rdynamic
 else
 ifeq ($(AUXBUILD),AUX)
 	CFLAGS_AUX= `pkg-config --cflags libxml-2.0` \
           -I ../../aux-packages/tcl8.5.9/generic/ \
           -I ../../aux-packages/build/include/ \
+          -I ../mental-fsm/p2vera/source/ \
           -I ./xml_support/ \
           -DGNULINUX -DAUXPACKAGES
     install_targets=install.gnulinux
@@ -32,12 +35,14 @@ ifeq ($(AUXBUILD),AUX)
         -ldl \
         -L ./xml_support/obj/ -lxmlsup  \
         -L ../../aux-packages/build/lib/ -lprotobuf \
+        -L ../bin/libs/ -lp2vera \
         -rdynamic
 else
     CFLAGS_AUX= `pkg-config --cflags libxml-2.0` \
           `pkg-config --cflags libpcre` \
           `pkg-config --cflags protobuf` \
           -I ./xml_support/ \
+          -I ../mental-fsm/p2vera/source/ \
           -DGNULINUX
     install_targets=install.gnulinux
     
@@ -45,6 +50,7 @@ else
         -lpthread \
         -ldl \
         -L ./xml_support/obj/ -lxmlsup  \
+        -L ../bin/libs/ -lp2vera \
         `pkg-config --libs protobuf` \
         -rdynamic
 endif
@@ -78,6 +84,7 @@ install.gnulinux: FORCE
 install.macos: FORCE
 	@install_name_tool -change ./obj/libxmlsup.dylib  @executable_path/libs/libxmlsup.dylib $(BUILD_DIR)/$(PROG)
 	@install_name_tool -change /usr/local/lib/libprotobuf.7.dylib  @executable_path/libs/libprotobuf.7.dylib $(BUILD_DIR)/$(PROG)
+	@install_name_tool -change ./obj/libp2vera.dylib  @executable_path/libs/libp2vera.dylib $(BUILD_DIR)/$(PROG)
 	@cp $(BUILD_DIR)/$(PROG) ../bin/
 	@echo Done
 

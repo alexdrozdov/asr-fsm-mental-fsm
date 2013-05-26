@@ -67,6 +67,7 @@ int main(int argc, const char *argv[]) {
 			P2VeraTextMessage p2tm;
 			p2ctrl >> p2tm;
 			string request_str = p2tm;
+			cout << "control message received: \"" << request_str << "\"" << endl;
 			if (0 == request_str.compare(0,17,"connect request: ")) {
 				string remote_id = request_str.substr(17, request_str.length()-17);
 				P2VeraTextMessage p2tm_grant((string)"connect grant: " + remote_id);
