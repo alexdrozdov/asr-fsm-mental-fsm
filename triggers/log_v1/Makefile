@@ -8,6 +8,7 @@ ifeq ($(OS),Darwin)
           -I ../../xml_support/ \
           -I ../../aux-packages/tcl8.5.9/generic/ \
           -I ../../../../aux-packages/build/include/ \
+          -I ../../../mental-fsm/p2vera/source/ \
           -DMACOSX -DAUXPACKAGES
     LIB_EXT=dylib
     install_targets=install.macos
@@ -16,6 +17,7 @@ ifeq ($(OS),Darwin)
          -lpthread \
          -ltcl8.5 \
          `pkg-config --libs libxml-2.0` \
+         -L ../../../bin/libs/ -lp2vera \
          -lxmlsup -L ../../xml_support/obj/
 else
 ifeq ($(AUXBUILD),AUX)
@@ -23,16 +25,19 @@ ifeq ($(AUXBUILD),AUX)
           -I ../../xml_support/ \
           -I ../../../../aux-packages/tcl8.5.9/generic/ \
           -I ../../../../aux-packages/build/include/ \
+          -I ../../../mental-fsm/p2vera/source/ \
           -DGNULINUX -DAUXPACKAGES
     install_targets=install.gnulinux
     
     LDFLAGS= -shared \
          -lpthread \
          -ltcl8.5 -L ../../../../aux-packages/build/lib/ \
+         -L ../../../bin/libs/ -lp2vera \
          -lxmlsup -L ../../xml_support/obj/
 else
     CF_AUX_FLAGS= `pkg-config --cflags libxml-2.0` \
           -I ../../xml_support/ \
+          -I ../../../mental-fsm/p2vera/source/ \
           -DGNULINUX
     install_targets=install.gnulinux
     
@@ -40,6 +45,7 @@ else
          -lpthread \
          -ltcl8.5 \
          `pkg-config --libs libxml-2.0` \
+         -L ../../../bin/libs/ -lp2vera \
          -lxmlsup -L ../../xml_support/obj/
 endif
 	LIB_EXT=so
@@ -69,6 +75,7 @@ install.gnulinux: FORCE
 	
 install.macos: FORCE
 	@install_name_tool -change ./obj/libxmlsup.dylib  @executable_path/libs/libxmlsup.dylib $(BUILD_DIR)/$(PROG)
+	@install_name_tool -change ./obj/libp2vera.dylib  @executable_path/libs/libp2vera.dylib $(BUILD_DIR)/$(PROG)
 	@cp $(BUILD_DIR)/$(PROG) ../../../bin/libs/
 
 dirs: FORCE

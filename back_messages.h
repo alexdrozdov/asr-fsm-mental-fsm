@@ -12,7 +12,7 @@
 
 #include "net_link.h"
 
-typedef struct _netlink_string_msg {
+/*typedef struct _netlink_string_msg {
 	int msg_type;
 	int msg_length;
 	long long start_time;
@@ -33,6 +33,6 @@ private:
 	long long duration;
 };
 
-
+*/
 
 #endif /* BACK_MESSAGES_H_ */

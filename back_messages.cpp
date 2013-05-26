@@ -17,7 +17,7 @@
 
 
 using namespace std;
-
+/*
 NetlinkMessage::~NetlinkMessage() {
 }
 
@@ -42,19 +42,9 @@ int NetlinkMessageString::RequiredSize() {
 }
 
 void NetlinkMessageString::Dump(unsigned char* space) {
-	unsigned char* pnt = space;
-
-	netlink_string_msg *pmsg_ptr = (netlink_string_msg*)pnt;
-	pmsg_ptr->msg_type   = nlmt_text;
-	pmsg_ptr->msg_length = RequiredSize();
-	pmsg_ptr->start_time = start_time;
-	pmsg_ptr->duration   = duration;
-
-	char *text_ptr = (char*)(((char*)pmsg_ptr)+sizeof(netlink_string_msg));
-	strncpy(text_ptr, msg_text.c_str(), msg_text.length());
-	text_ptr[msg_text.length()] = 0;
 }
 
 void NetlinkMessageString::Clear() {
 	msg_text = "";
 }
+*/

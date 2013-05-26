@@ -3,7 +3,6 @@
 // Author      : Drozdov A. V.
 // Version     :
 // Copyright   : Your copyright notice
-// Description : Hello World in C++, Ansi-style
 //============================================================================
 
 #include <iostream>
@@ -21,6 +20,7 @@
 #include <tcl8.5/tcl.h>
 #endif
 
+#include "common.h"
 #include "base_trigger.h"
 #include "virt_trigger.h"
 #include "mental_fsm.h"
@@ -29,6 +29,8 @@
 #include "xml_config.h"
 #include "global_vars.h"
 #include "trigger_loader.h"
+#include "tclinterp_stream.h"
+#include "p2vera_control.h"
 
 using namespace std;
 
@@ -41,6 +43,7 @@ int mkdump_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST ch
 int fsm_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int triggers_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 int triglib_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
+int p2vera_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]);
 
 int init_trigger_handles(Tcl_Interp *interp) {
 	load_trigger_handlers["virt"]   = (trigger_init_ptr)load_virt_trigger;
@@ -216,11 +219,18 @@ int init_mentalstate_structs(Tcl_Interp *interp) {
 			(Tcl_CmdDeleteProc*) NULL
 	);
 
+	Tcl_CreateCommand(interp,
+			"p2vera",
+			p2vera_handler,
+			(ClientData) NULL,
+			(Tcl_CmdDeleteProc*) NULL
+	);
+
 
 	fsm = new MentalFsm();
 	create_trigger_tree();
 	init_trigger_handles(interp);
-	create_net_link(project_path + "netlink.xml");
+	net_link = new CNetLink();
 
 	Tcl_SetVar(interp, "mental_fsm(loaded)", "1",TCL_GLOBAL_ONLY);
 	return 0;
@@ -509,5 +519,43 @@ int mkdump_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST ch
 	return TCL_OK;
 }
 
-
+int p2vera_handler(ClientData clientData, Tcl_Interp* interp, int argc, CONST char *argv[]) {
+	//p2vera load config_file_name
+	//p2vera info
+	//p2vera dump enable|disable
+	InterpResultStream irs(interp);
+	if (3 == argc) {
+		string cmd = argv[1];
+		if ("load" == cmd) {
+			string config_name = build_project_path(argv[2]);
+			p2v = new P2Vera(config_name);
+			p2vctrl = new P2VeraControl(p2v);
+			return TCL_OK;
+		}
+		irs << irs_clear << "p2vera_handler error: wrong parameters" << irs_apply;
+		return TCL_ERROR;
+	}
+	if (2 == argc) {
+		string cmd = argv[1];
+		if ("enable" == cmd) {
+			if (NULL == p2v) {
+				irs << irs_clear << "p2vera_handler error - p2vera wasnt initialized properly" << irs_apply;
+				return TCL_ERROR;
+			}
+			p2v->start_network();
+			p2vctrl->start();
+			return TCL_OK;
+		}
+		if ("uniqid" == cmd) {
+			if (NULL == p2v) {
+				irs << irs_clear << "p2vera_handler error - p2vera wasnt initialized properly" << irs_apply;
+				return TCL_ERROR;
+			}
+			irs << irs_clear << p2v->get_uniq_id() << irs_apply;
+			return TCL_OK;
+		}
+	}
+	irs << irs_clear << "p2vera_handler error: wrong parameters" << irs_apply;
+	return TCL_ERROR;
+}
 
