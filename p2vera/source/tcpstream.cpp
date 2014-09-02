@@ -193,7 +193,7 @@ bool TcpStreamConnection::receive_message() {
 		process_buffer(buf,ret);
 	}
 	if (0 == ret) {
-		cout << "TcpStreamConnection::receive_message error - read returned " << ret << endl;
+		//cout << "TcpStreamConnection::receive_message error - read returned " << ret << endl;
 		return false;
 	}
 	return true;
@@ -305,7 +305,7 @@ int TcpStreamConnection::process_buffer(unsigned char* buf, int len) {
 bool TcpStreamConnection::send_data(std::string data) {
 	//Определяем длину сообщения после его кодирования
 	int msg_len = 0;
-	int data_len = data.length();
+	int data_len = data.size();
 	for (int i=0;i<data_len;i++) {
 		unsigned char c = (unsigned char)data[i];
 		msg_len += coded_length[c];
@@ -517,7 +517,7 @@ int TcpStreamManager::accept_thread() {
 }
 
 TcpStream TcpStreamManager::find_stream(RemoteSrvUnit rsu) {
-	TcpStream tc(NULL);
+	TcpStream tc(NULL); //FIXME Вызывает warning о нулевом указателе
 	pthread_mutex_lock(&mtx);
 	for (list<rsu_fd_item>::iterator it=rsu_fd_items.begin();it!=rsu_fd_items.end();it++) {
 		if (rsu == it->rsu) {

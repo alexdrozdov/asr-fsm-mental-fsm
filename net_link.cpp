@@ -26,6 +26,7 @@
 #include "back_messages.h"
 #include "global_vars.h"
 #include "p2vera_dsp.h"
+#include "tclinterp_stream.h"
 
 using namespace std;
 
@@ -53,10 +54,21 @@ int CNetLink::handle_network() {
 			continue;
 		}
 		pfd[0].revents = 0;
+		//cout << "CNetLink::handle_network info - msg received" << endl;
 		p2s_c2s >> dmc;
-		if (dmc.has_time()) process_time_msg(dmc.dsp().time_inst(0));
-		if (dmc.has_samplerate()) process_samplerate_msg(dmc.dsp().samplerate_inst(0));
-		if (dmc.has_trig()) process_trig_msg(dmc.dsp().modified_triggers_inst(0));
+		//cout << "CNetLink::handle_network info - msg poped" << endl;
+		if (dmc.has_time()) {
+			//cout << "CNetLink::handle_network info - has time" << endl;
+			process_time_msg(dmc.dsp().time_inst(0));
+		}
+		if (dmc.has_samplerate()) {
+			//cout << "CNetLink::handle_network info - has samplerate" << endl;
+			process_samplerate_msg(dmc.dsp().samplerate_inst(0));
+		}
+		if (dmc.has_trig()) {
+			//cout << "CNetLink::handle_network info - has trig" << endl;
+			process_trig_msg(dmc.dsp().modified_triggers_inst(0));
+		}
 		dmc.Clear();
 	}
 	delete[] pfd;
@@ -64,25 +76,17 @@ int CNetLink::handle_network() {
 }
 
 int CNetLink::process_trig_msg(const ::dsp::modified_triggers& mt) {
+	//cout << "CNetLink::process_trig_msg info - launched" << endl;
 	::google::protobuf::RepeatedPtrField< ::dsp::modified_triger>::const_iterator ctit;
 	for (ctit=mt.items().begin();ctit!=mt.items().end();ctit++) {
 		const ::dsp::modified_triger& mmt = *ctit;
-		if (dump_enabled && dump_to_file) {
-			dump_stream << "CNetLink::process_trig_msg info - trigger id: " << mmt.id() << "; outputs size: " << mmt.outputs_size();
-			dump_stream << "; outputs: ";
+		if (ds_in.enabled()) {
+			ds_in << "CNetLink::process_trig_msg info - trigger id: " << mmt.id() << "; outputs size: " << mmt.outputs_size();
+			ds_in << "; outputs: ";
 			::google::protobuf::RepeatedPtrField< ::dsp::trigger_output>::const_iterator coit;
-			for (coit=mmt.outputs().begin();coit!=mmt.outputs().end();coit++) {
-				dump_stream << " out[" << coit->out_id() << "]=" << coit->value();
-			}
-			dump_stream << endl;
-		} else if (dump_enabled) {
-			cout << "CNetLink::process_trig_msg info - trigger id: " << mmt.id() << "; outputs size: " << mmt.outputs_size();
-			cout << "; outputs: ";
-			::google::protobuf::RepeatedPtrField< ::dsp::trigger_output>::const_iterator coit;
-			for (coit=mmt.outputs().begin();coit!=mmt.outputs().end();coit++) {
-				cout << " out[" << coit->out_id() << "]=" << coit->value();
-			}
-			cout << endl;
+			for (coit=mmt.outputs().begin();coit!=mmt.outputs().end();coit++)
+				ds_in << " out[" << coit->out_id() << "]=" << coit->value();
+			ds_in << endl;
 		}
 
 		if (0 == mmt.outputs_size()) {
@@ -103,16 +107,13 @@ int CNetLink::process_trig_msg(const ::dsp::modified_triggers& mt) {
 			vt->SetOutput(coit->out_id(), coit->value());
 		}
 	}
+	//cout << "CNetLink::process_trig_msg info - ready" << endl;
 	return 0;
 }
 
 int CNetLink::process_time_msg(const ::dsp::time_message& tm) {
 	long long new_time = tm.current_time();
-	if (dump_enabled && dump_to_file) {
-		dump_stream << "CNetLink::process_time_msg info - remote time is " << new_time << endl;
-	} else if (dump_enabled) {
-		cout << "CNetLink::process_time_msg info - remote time is " << new_time << endl;
-	}
+	ds_in << "CNetLink::process_time_msg info - remote time is " << new_time << endl;
 	if (new_time < fsm->GetCurrentTime()) {
 		cout << "CNetLink::process_time_msg atacked - time " << new_time << " is less than current time " << fsm->GetCurrentTime() << endl;
 		exit(4);
@@ -122,16 +123,13 @@ int CNetLink::process_time_msg(const ::dsp::time_message& tm) {
 }
 
 int CNetLink::process_samplerate_msg(const ::dsp::samplerate_message& srtm) {
-	if (dump_enabled && dump_to_file) {
-		dump_stream << "CNetLink::process_samplerate_msg info - remote samplerate is " << srtm.samplerate() << endl;
-	} else if (dump_enabled) {
-		cout << "CNetLink::process_samplerate_msg - remote samplerate is " << srtm.samplerate() << endl;
-	}
+	ds_in << "CNetLink::process_samplerate_msg info - remote samplerate is " << srtm.samplerate() << endl;
 	fsm->SetRemoteSamplerate(srtm.samplerate());
 	return 0;
 }
 
 void CNetLink::SendTextResponse(std::string response_text) {
+	cout << response_text << endl;
 	//NetlinkMessageString* nms = new NetlinkMessageString(response_text);
 	//FIXME Оранизовать отправку через p2vera и определиться, в каких случаях должна применяться эта функция
 	//Send(nms);
@@ -143,6 +141,8 @@ bool CNetLink::connect_client(P2VeraStream p2s_c2s, P2VeraStream p2s_s2c) {
 	enabled = true;
 	this->p2s_c2s = p2s_c2s;
 	this->p2s_s2c = p2s_s2c;
+	pthread_t thread_id;
+	pthread_create (&thread_id, NULL, &handle_network_thread, this);
 	return true;
 }
 
@@ -218,18 +218,22 @@ int CNetLink::MkDump(bool enable, string file_name) {
 
 
 int CNetLink::TclHandler(Tcl_Interp* interp, int argc, CONST char *argv[]) {
+	InterpResultStream irs(interp);
 	if (3<=argc) {
 		string cmd_op = argv[1];
 		string cmd_pr = argv[2];
 		if ("dump_instream" == cmd_op) {
-			if ("on" == cmd_pr) {
-				dump_instream = true;
-				cout << "OK" << endl;
+			if ("enable" == cmd_pr) {
+				ds_in.set_stdout();
+				irs << irs_clear << "ok" << irs_apply;
 				return TCL_OK;
-			} else if ("off" == cmd_pr) {
-				dump_instream = false;
-				cout << "OK" << endl;
+			} else if ("disable" == cmd_pr) {
+				ds_in.disable();
+				irs << irs_clear << "ok" << irs_apply;
 				return TCL_OK;
+			} else {
+				irs << irs_clear << "netlink dump_instream error - options on/off" << irs_apply;
+				return TCL_ERROR;
 			}
 		}
 		if ("dump_ostream" == cmd_op) {
@@ -246,14 +250,15 @@ int CNetLink::TclHandler(Tcl_Interp* interp, int argc, CONST char *argv[]) {
 			}
 
 			if (!bfile_name) {
-				MkDump(bdump_enable);
+				ds_out.set_stdout();
 			} else {
-				MkDump(bdump_enable, file_name);
+				ds_out.set_file(file_name);
 			}
+			irs << irs_clear << "ok" << irs_apply;
 			return TCL_OK;
 		}
 	}
-	cout << "Unknown command operands" << endl;
+	irs << irs_clear << "unknown command operands" << irs_apply;
 	return TCL_ERROR;
 }
 

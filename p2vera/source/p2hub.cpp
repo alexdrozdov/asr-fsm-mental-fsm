@@ -109,6 +109,7 @@ bool P2VeraStreamHub::send_message(IP2VeraMessage& p2m) {
 			qq._insert_message(p2bm);
 		}
 	}
+	//FIXME Для типа потока stream почему-то вызывается udp-шная функция
 	//Рассылаем сообщение всем удаленным хабам, соединенным с текущим хабом
 	for (list<remote_hub>::iterator it=remote_hubs.begin();it!=remote_hubs.end();it++) {
 		sockaddr_in& sa = it->sa;
@@ -119,7 +120,6 @@ bool P2VeraStreamHub::send_message(IP2VeraMessage& p2m) {
 	}
 	//Рассылаем сообщение через какналы tcp
 	for (list<TcpStream>::iterator it=tcsl.begin();it!=tcsl.end();it++) {
-		//TcpStream* tcs = *it;
 		it->send_message(p2m, this);
 	}
 	pthread_mutex_unlock(&mtx);

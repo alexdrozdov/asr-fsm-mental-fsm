@@ -18,7 +18,7 @@ using namespace std;
 MentalFsm* fsm = NULL;
 CTriggerTree* trigger_tree = NULL;
 
-CLogTrigger::CLogTrigger(string file_name) {
+CLogTrigger::CLogTrigger(string file_name) : CBaseTrigger() {
 	xmlConfigPtr xml = CreateXmlConfig((char*)file_name.c_str());
 	if (NULL == xml) {
 		cout << "CLogTrigger::CLogTrigger error: couldn`t load file <" << file_name << ">" << endl;

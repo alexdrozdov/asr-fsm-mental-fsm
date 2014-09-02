@@ -14,6 +14,18 @@
 
 using namespace std;
 
+CBaseTrigger::CBaseTrigger() :
+	trigger_type(0),
+	value(0),
+	enabled(true),
+	prohibit_time(0),
+	tree_leaf(NULL),
+	touched(false),
+	postprocess(false),
+	dump_enabled(false),
+	dump_to_file(false)
+{}
+
 void CBaseTrigger::AddToDynamicTree() {
 	if (touched) {
 		//Триггер и так уже добавлен в дерево

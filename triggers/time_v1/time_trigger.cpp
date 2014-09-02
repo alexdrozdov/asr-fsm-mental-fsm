@@ -20,7 +20,7 @@ using namespace std;
 
 
 
-CTimeTrigger::CTimeTrigger(string file_name) {
+CTimeTrigger::CTimeTrigger(string file_name) : CBaseTrigger()  {
 	xmlConfigPtr xml = CreateXmlConfig((char*)file_name.c_str());
 	if (NULL == xml) {
 		cout << "CTimeTrigger::CTimeTrigger error: couldn`t load file <" << file_name << ">" << endl;

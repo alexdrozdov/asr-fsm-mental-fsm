@@ -17,7 +17,7 @@
 using namespace std;
 
 
-CNeuroTrigger::CNeuroTrigger(string file_name) {
+CNeuroTrigger::CNeuroTrigger(string file_name) : CBaseTrigger()  {
 	xmlConfigPtr xml = CreateXmlConfig((char*)file_name.c_str());
 	if (NULL == xml) {
 		cout << "CNeuroTrigger::CNeuroTrigger error: couldn`t load file <" << file_name << ">" << endl;

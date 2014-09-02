@@ -20,7 +20,7 @@ MentalFsm* fsm = NULL;
 CTriggerTree* trigger_tree = NULL;
 
 
-CPcreTrigger::CPcreTrigger(string file_name) {
+CPcreTrigger::CPcreTrigger(string file_name) : CBaseTrigger()  {
 	xmlConfigPtr xml = CreateXmlConfig((char*)file_name.c_str());
 	pxml_tmp = (void*)xml;
 	if (NULL == xml) {

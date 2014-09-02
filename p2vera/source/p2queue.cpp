@@ -142,7 +142,8 @@ void  P2VeraStreamQq::_insert_message(P2VeraBasicMessage& p2m) {
 	if (in_qq.size() < max_incoming_qq_size) {
 		string str; //Избавляемся от поведения copy on write, реализованого в std::string
 		p2m.get_data(str);
-		P2VeraBasicMessage p2m_copy(str.c_str());
+		P2VeraBasicMessage p2m_copy; //FIXME Оригинальная строка P2VeraBasicMessage p2m_copy(str.data()); Выяснить безовасность с точки зрения copyon write
+		p2m_copy.set_data((void*)str.data(), (int)str.size());
 		in_qq.push(p2m_copy);
 	} else {
 		cout << "P2VeraStreamQq::_insert_message warning - queue overflow, message lost" << endl;
