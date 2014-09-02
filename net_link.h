@@ -30,6 +30,7 @@
 
 #include "base_trigger.h"
 #include "virt_trigger.h"
+#include "dump.h"
 
 extern void* handle_network_thread (void* thread_arg);
 
@@ -73,6 +74,8 @@ private:
 	std::ofstream dump_stream; //Поток, в который выводится дамп
 
 	friend void* handle_network_thread(void* thread_arg);
+	DumpStream ds_in;
+	DumpStream ds_out;
 };
 
 

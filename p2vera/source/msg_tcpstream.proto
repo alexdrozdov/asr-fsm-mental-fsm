@@ -16,7 +16,7 @@ message msg_add_flow_rp { //Сообщение с подтверждением �
 
 message tcp_flow_wrapper {
 	required int32 flow_id    = 1;
-	required string flow_data = 2;
+	required bytes flow_data = 2;
 }
 
 message tcp_wrapper {

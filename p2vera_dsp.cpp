@@ -139,7 +139,7 @@ bool DspMessageCmn::has_samplerate() {
 }
 
 void DspMessageCmn::Clear() {
-	pkg.mutable_samplerate_inst(0)->Clear();
+	pkg.Clear();
 }
 
 DspMessageCmn& DspMessageCmn::operator>>(DspMessageTrig& dsp_trig) {

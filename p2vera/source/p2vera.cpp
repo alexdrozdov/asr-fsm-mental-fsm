@@ -118,8 +118,10 @@ P2Vera::P2Vera(std::string cfg_file) {
 			string proto = it_proto->to_string();
 			if ("flow" == proto) {
 				stream_cfg.type = stream_type_flow;
-			} else {
+			} else if ("dgram" == proto){
 				stream_cfg.type = stream_type_dgram;
+			} else {
+				cout << "P2Vera::P2Vera warning - unknown protocol " << proto << ", assuming dgram" << endl;
 			}
 		}
 		register_stream(stream_cfg);

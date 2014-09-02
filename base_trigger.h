@@ -47,6 +47,7 @@ class CTriggerTree;
 
 class CBaseTrigger {
 public:
+	CBaseTrigger();
 	std::string szTriggerName; //Название триггера
 
 	virtual bool GetEnabled() = 0;
